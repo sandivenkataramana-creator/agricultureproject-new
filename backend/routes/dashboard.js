@@ -18,6 +18,272 @@ function buildBudgetYearFilter(year) {
   return { clause: 'WHERE financial_year = ?', params: [fy] };
 }
 
+function currentFinancialYear() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1; // 1-12
+  const startYear = month >= 4 ? year : year - 1;
+  return `${startYear}-${(startYear + 1).toString().slice(2)}`;
+}
+
+// Schemes summary: Total / Active / Inactive with Central vs State breakdown
+router.get('/schemes-summary', async (req, res) => {
+  try {
+    const hodId = req.query.hod_id;
+    const year = formatFinancialYear(req.query.year) || currentFinancialYear();
+
+    let hodName = null;
+    if (hodId) {
+      const [hodRows] = await db.query('SELECT name FROM hods WHERE id = ?', [hodId]);
+      hodName = hodRows?.[0]?.name || null;
+    }
+
+    // CENTRAL schemes are stored in `schemes`
+    // STATE schemes are stored in `state_scheme_financials`
+    const centralWhere = ['financial_year = ?'];
+    const centralParams = [year];
+    if (hodId && hodName) {
+      // Some installs store HOD linkage as text `hod`, others via `hod_id`
+      centralWhere.push('(hod = ? OR hod_id = ?)');
+      centralParams.push(hodName, hodId);
+    }
+
+    const [centralTotalRows] = await db.query(
+      `SELECT COUNT(*) AS count FROM schemes WHERE ${centralWhere.join(' AND ')}`,
+      centralParams
+    );
+    const [centralActiveRows] = await db.query(
+      `SELECT COUNT(*) AS count FROM schemes WHERE ${centralWhere.join(' AND ')} AND status IN ('ACTIVE','active')`,
+      centralParams
+    );
+
+    const centralTotal = centralTotalRows?.[0]?.count || 0;
+    const centralActive = centralActiveRows?.[0]?.count || 0;
+
+    // State schemes table may not exist on older DBs; treat as 0 if missing.
+    let stateTotal = 0;
+    let stateActive = 0;
+    try {
+      const stateWhere = ['financial_year = ?'];
+      const stateParams = [year];
+      if (hodId && hodName) {
+        stateWhere.push('hod = ?');
+        stateParams.push(hodName);
+      }
+
+      const [stateTotalRows] = await db.query(
+        `SELECT COUNT(*) AS count FROM state_scheme_financials WHERE ${stateWhere.join(' AND ')}`,
+        stateParams
+      );
+      const [stateActiveRows] = await db.query(
+        `SELECT COUNT(*) AS count FROM state_scheme_financials WHERE ${stateWhere.join(' AND ')} AND status = 'active'`,
+        stateParams
+      );
+
+      stateTotal = stateTotalRows?.[0]?.count || 0;
+      stateActive = stateActiveRows?.[0]?.count || 0;
+    } catch (e) {
+      console.warn('State schemes table missing/unavailable, defaulting to 0:', e.message);
+    }
+
+    const total = centralTotal + stateTotal;
+    const active = centralActive + stateActive;
+    const inactive = Math.max(0, total - active);
+
+    const centralInactive = Math.max(0, centralTotal - centralActive);
+    const stateInactive = Math.max(0, stateTotal - stateActive);
+
+    return res.json({
+      year,
+      total: { total, central: centralTotal, state: stateTotal },
+      active: { total: active, central: centralActive, state: stateActive },
+      inactive: { total: inactive, central: centralInactive, state: stateInactive }
+    });
+  } catch (error) {
+    console.error('Dashboard schemes-summary error:', error);
+    return res.json({
+      year: formatFinancialYear(req.query.year) || currentFinancialYear(),
+      total: { total: 0, central: 0, state: 0 },
+      active: { total: 0, central: 0, state: 0 },
+      inactive: { total: 0, central: 0, state: 0 }
+    });
+  }
+});
+
+// Budget summary: Total / Utilized / Remaining with Central vs State breakdown
+router.get('/budget-summary', async (req, res) => {
+  try {
+    const year = formatFinancialYear(req.query.year) || currentFinancialYear();
+    const hodId = req.query.hod_id;
+
+    // Base filters
+    const where = ['financial_year = ?'];
+    const params = [year];
+    if (hodId) {
+      where.push('hod_id = ?');
+      params.push(hodId);
+    }
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    // Try to use breakdown columns first
+    let totalCentral = 0;
+    let totalState = 0;
+    let remainingCentral = 0;
+    let remainingState = 0;
+    let utilizedCentral = 0;
+    let utilizedState = 0;
+    let usedBreakdown = false;
+
+    try {
+      const [rows] = await db.query(
+        `SELECT
+           COALESCE(SUM(budget_sanction_central), 0) AS total_c,
+           COALESCE(SUM(budget_sanction_state), 0) AS total_s,
+           COALESCE(SUM(budget_remaining_central), 0) AS rem_c,
+           COALESCE(SUM(budget_remaining_state), 0) AS rem_s
+         FROM budget
+         ${whereSql}`,
+        params
+      );
+      totalCentral = parseFloat(rows?.[0]?.total_c) || 0;
+      totalState = parseFloat(rows?.[0]?.total_s) || 0;
+      remainingCentral = parseFloat(rows?.[0]?.rem_c) || 0;
+      remainingState = parseFloat(rows?.[0]?.rem_s) || 0;
+
+      // Consider it usable if any breakdown values exist
+      usedBreakdown = (totalCentral + totalState + remainingCentral + remainingState) > 0;
+      if (usedBreakdown) {
+        utilizedCentral = Math.max(0, totalCentral - remainingCentral);
+        utilizedState = Math.max(0, totalState - remainingState);
+      }
+    } catch (e) {
+      usedBreakdown = false;
+    }
+
+    // Fallbacks if breakdown columns are empty
+    if (!usedBreakdown) {
+      // Try estimation columns as totals
+      try {
+        const [rows2] = await db.query(
+          `SELECT
+             COALESCE(SUM(budget_estimation_central), 0) AS total_c,
+             COALESCE(SUM(budget_estimation_state), 0) AS total_s
+           FROM budget
+           ${whereSql}`,
+          params
+        );
+        totalCentral = parseFloat(rows2?.[0]?.total_c) || 0;
+        totalState = parseFloat(rows2?.[0]?.total_s) || 0;
+        usedBreakdown = (totalCentral + totalState) > 0;
+      } catch (e) {
+        usedBreakdown = false;
+      }
+    }
+
+    // Overall totals always available
+    const [overallRows] = await db.query(
+      `SELECT
+         COALESCE(SUM(allocated_amount), 0) AS allocated,
+         COALESCE(SUM(utilized_amount), 0) AS utilized
+       FROM budget
+       ${whereSql}`,
+      params
+    );
+    const overallTotal = parseFloat(overallRows?.[0]?.allocated) || 0;
+    const overallUtilized = parseFloat(overallRows?.[0]?.utilized) || 0;
+    const overallRemaining = Math.max(0, overallTotal - overallUtilized);
+
+    // If we still don't have a meaningful split, treat it as State budget
+    if (!usedBreakdown) {
+      totalCentral = 0;
+      totalState = overallTotal;
+      utilizedCentral = 0;
+      utilizedState = overallUtilized;
+      remainingCentral = 0;
+      remainingState = overallRemaining;
+    } else {
+      // Ensure remaining values exist when we only have totals
+      if ((remainingCentral + remainingState) === 0 && (totalCentral + totalState) > 0) {
+        // Distribute remaining proportionally using overallRemaining
+        const denom = totalCentral + totalState;
+        remainingCentral = denom > 0 ? (overallRemaining * (totalCentral / denom)) : 0;
+        remainingState = denom > 0 ? (overallRemaining * (totalState / denom)) : 0;
+        utilizedCentral = Math.max(0, totalCentral - remainingCentral);
+        utilizedState = Math.max(0, totalState - remainingState);
+      }
+    }
+
+    return res.json({
+      year,
+      total: { total: overallTotal, central: totalCentral, state: totalState },
+      utilized: { total: overallUtilized, central: utilizedCentral, state: utilizedState },
+      remaining: { total: overallRemaining, central: remainingCentral, state: remainingState }
+    });
+  } catch (error) {
+    console.error('Dashboard budget-summary error:', error);
+    return res.json({
+      year: formatFinancialYear(req.query.year) || currentFinancialYear(),
+      total: { total: 0, central: 0, state: 0 },
+      utilized: { total: 0, central: 0, state: 0 },
+      remaining: { total: 0, central: 0, state: 0 }
+    });
+  }
+});
+// Budget detailed breakdown: Estimated / Sanction / Pending
+router.get('/budget-breakdown', async (req, res) => {
+  try {
+    const year = formatFinancialYear(req.query.year) || currentFinancialYear();
+    const hodId = req.query.hod_id;
+
+    const where = ['financial_year = ?'];
+    const params = [year];
+    if (hodId) {
+      where.push('hod_id = ?');
+      params.push(hodId);
+    }
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    // Get all budget breakdown columns
+    const [rows] = await db.query(
+      `SELECT
+         COALESCE(SUM(budget_estimation_central), 0) AS estimation_c,
+         COALESCE(SUM(budget_estimation_state), 0) AS estimation_s,
+         COALESCE(SUM(budget_sanction_central), 0) AS sanction_c,
+         COALESCE(SUM(budget_sanction_state), 0) AS sanction_s,
+         COALESCE(SUM(budget_remaining_central), 0) AS remaining_c,
+         COALESCE(SUM(budget_remaining_state), 0) AS remaining_s
+       FROM budget
+       ${whereSql}`,
+      params
+    );
+
+    const estimatedCentral = parseFloat(rows?.[0]?.estimation_c) || 0;
+    const estimatedState = parseFloat(rows?.[0]?.estimation_s) || 0;
+    const sanctionCentral = parseFloat(rows?.[0]?.sanction_c) || 0;
+    const sanctionState = parseFloat(rows?.[0]?.sanction_s) || 0;
+    const remainingCentral = parseFloat(rows?.[0]?.remaining_c) || 0;
+    const remainingState = parseFloat(rows?.[0]?.remaining_s) || 0;
+
+    // Pending = Sanction - Remaining (amount spent)
+    const pendingCentral = Math.max(0, sanctionCentral - remainingCentral);
+    const pendingState = Math.max(0, sanctionState - remainingState);
+
+    return res.json({
+      year,
+      estimated: { total: estimatedCentral + estimatedState, central: estimatedCentral, state: estimatedState },
+      sanction: { total: sanctionCentral + sanctionState, central: sanctionCentral, state: sanctionState },
+      pending: { total: pendingCentral + pendingState, central: pendingCentral, state: pendingState }
+    });
+  } catch (error) {
+    console.error('Dashboard budget-breakdown error:', error);
+    return res.json({
+      year: formatFinancialYear(req.query.year) || currentFinancialYear(),
+      estimated: { total: 0, central: 0, state: 0 },
+      sanction: { total: 0, central: 0, state: 0 },
+      pending: { total: 0, central: 0, state: 0 }
+    });
+  }
+});
 // Get dashboard overview stats
 router.get('/stats', async (req, res) => {
   try {
@@ -40,13 +306,13 @@ router.get('/stats', async (req, res) => {
       const [totalStaff] = await db.query('SELECT COUNT(*) as count FROM staff WHERE hod_id = ?', [hodId]);
       const [activeStaff] = await db.query('SELECT COUNT(*) as count FROM staff WHERE hod_id = ? AND status = "active"', [hodId]);
 
-      // Today's attendance stats with late status (after 10:45 AM)
+      // Today's attendance stats with late status (after 10:30 AM)
       const [todayAttendance] = await db.query(`
         SELECT 
           COUNT(*) as total_records,
-          COUNT(CASE WHEN status = 'present' THEN 1 END) as present,
+          COUNT(CASE WHEN status = 'present' AND (check_in IS NULL OR TIME(check_in) <= '10:30:00') THEN 1 END) as present,
           COUNT(CASE WHEN status = 'absent' THEN 1 END) as absent,
-          COUNT(CASE WHEN status = 'late' OR (status = 'present' AND TIME(check_in) > '10:45:00') THEN 1 END) as late,
+          COUNT(CASE WHEN status = 'late' OR (status = 'present' AND TIME(check_in) > '10:30:00') THEN 1 END) as late,
           COUNT(CASE WHEN status = 'half_day' THEN 1 END) as half_day,
           COUNT(CASE WHEN status = 'leave' OR status = 'on_leave' THEN 1 END) as on_leave
         FROM attendance 
@@ -88,13 +354,13 @@ router.get('/stats', async (req, res) => {
     const [totalStaff] = await db.query('SELECT COUNT(*) as count FROM staff');
     const [activeStaff] = await db.query('SELECT COUNT(*) as count FROM staff WHERE status = "active"');
 
-    // Today's attendance stats with late status (after 10:45 AM)
+    // Today's attendance stats with late status (after 10:30 AM)
     const [todayAttendance] = await db.query(`
       SELECT 
         COUNT(*) as total_records,
-        COUNT(CASE WHEN status = 'present' THEN 1 END) as present,
+        COUNT(CASE WHEN status = 'present' AND (check_in IS NULL OR TIME(check_in) <= '10:30:00') THEN 1 END) as present,
         COUNT(CASE WHEN status = 'absent' THEN 1 END) as absent,
-        COUNT(CASE WHEN status = 'late' OR (status = 'present' AND TIME(check_in) > '10:45:00') THEN 1 END) as late,
+        COUNT(CASE WHEN status = 'late' OR (status = 'present' AND TIME(check_in) > '10:30:00') THEN 1 END) as late,
         COUNT(CASE WHEN status = 'half_day' THEN 1 END) as half_day,
         COUNT(CASE WHEN status = 'leave' OR status = 'on_leave' THEN 1 END) as on_leave
       FROM attendance 
@@ -104,9 +370,9 @@ router.get('/stats', async (req, res) => {
     const budgetSql = `SELECT COALESCE(SUM(allocated_amount), 0) as total, COALESCE(SUM(utilized_amount), 0) as utilized FROM budget ${budgetFilter.clause}`;
     const [budget] = await db.query(budgetSql, budgetFilter.params);
 
-    // Programs count
-    const [totalPrograms] = await db.query('SELECT COUNT(*) as count FROM programs');
-    const [activePrograms] = await db.query('SELECT COUNT(*) as count FROM programs WHERE status = "active"');
+    // Programs count (using flagship_programmes instead)
+    const [totalPrograms] = await db.query('SELECT COUNT(*) as count FROM flagship_programmes');
+    const [activePrograms] = await db.query('SELECT COUNT(*) as count FROM flagship_programmes WHERE status = "active"');
 
     res.json({
       totalHods: totalHods[0].count || 0,
@@ -129,7 +395,7 @@ router.get('/stats', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Dashboard stats error:', error);
+    console.error('Dashboard stats error:', error.message);
     // Return sensible defaults so UI remains functional even if DB is not reachable
     return res.json({
       totalHods: 0,

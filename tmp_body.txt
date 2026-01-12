@@ -1,0 +1,1 @@
+{"error":"You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 's.employee_type = ?\n      GROUP BY h.id, h.name, h.department\n      ORDER BY ...' at line 14"}

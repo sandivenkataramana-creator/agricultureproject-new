@@ -119,7 +119,7 @@ router.delete('/:id', ...superAdminOnly, async (req, res) => {
 // Get attendance statistics with filters
 router.get('/statistics', async (req, res) => {
   try {
-    const { start_date, end_date, hod_id, period, status, employee_type } = req.query;
+    const { start_date, end_date, hod_id, department, period, status, employee_type } = req.query;
     
     let dateFilter = '';
     let params = [];
@@ -144,6 +144,11 @@ router.get('/statistics', async (req, res) => {
       params.push(hod_id);
     }
 
+    if (department) {
+      dateFilter += dateFilter ? ' AND h.department = ?' : 'WHERE h.department = ?';
+      params.push(department);
+    }
+
     if (employee_type && employee_type !== 'all') {
       dateFilter += dateFilter ? ' AND s.employee_type = ?' : 'WHERE s.employee_type = ?';
       params.push(employee_type);
@@ -162,6 +167,7 @@ router.get('/statistics', async (req, res) => {
         COUNT(DISTINCT a.date) as working_days
       FROM attendance a
       LEFT JOIN staff s ON a.staff_id = s.id
+      LEFT JOIN hods h ON a.hod_id = h.id
       ${dateFilter}
     `, params);
     
@@ -177,6 +183,7 @@ router.get('/statistics', async (req, res) => {
         COUNT(CASE WHEN a.status = 'late' OR (a.status = 'present' AND a.check_in IS NOT NULL AND TIME(a.check_in) > '10:45:00') THEN 1 END) as late
       FROM attendance a
       LEFT JOIN staff s ON a.staff_id = s.id
+      LEFT JOIN hods h ON a.hod_id = h.id
       ${dateFilter}
       GROUP BY DATE_FORMAT(a.date, '%Y-%m'), DATE_FORMAT(a.date, '%b %Y')
       ORDER BY month DESC
@@ -197,6 +204,10 @@ router.get('/statistics', async (req, res) => {
       dailyFilter += ' AND a.hod_id = ?';
       dailyParams.push(hod_id);
     }
+    if (department) {
+      dailyFilter += ' AND h.department = ?';
+      dailyParams.push(department);
+    }
     if (employee_type && employee_type !== 'all') {
       dailyFilter += ' AND s.employee_type = ?';
       dailyParams.push(employee_type);
@@ -214,6 +225,7 @@ router.get('/statistics', async (req, res) => {
         COUNT(CASE WHEN a.status = 'late' OR (a.status = 'present' AND a.check_in IS NOT NULL AND TIME(a.check_in) > '10:45:00') THEN 1 END) as late
       FROM attendance a
       LEFT JOIN staff s ON a.staff_id = s.id
+      LEFT JOIN hods h ON a.hod_id = h.id
       ${dailyFilter}
       GROUP BY DATE_FORMAT(a.date, '%Y-%m-%d'), DATE_FORMAT(a.date, '%d %b')
       ORDER BY day DESC
@@ -278,10 +290,104 @@ router.get('/statistics', async (req, res) => {
   }
 });
 
+// Get department-wise attendance with employee lists
+router.get('/department-wise', async (req, res) => {
+  try {
+    const { period, employee_type } = req.query;
+
+    const dateCondition = (() => {
+      if (period === 'today') return 'DATE(a.date) = CURDATE()';
+      if (period === 'week') return 'a.date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)';
+      if (period === 'month') return 'a.date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)';
+      if (period === 'quarter') return 'a.date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)';
+      if (period === 'year') return 'a.date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)';
+      return '';
+    })();
+
+    const attendanceJoinFilter = dateCondition ? ` AND ${dateCondition}` : '';
+    const safeEmployeeType = ['regular', 'outsource'].includes(String(employee_type || '').toLowerCase())
+      ? String(employee_type).toLowerCase()
+      : null;
+    const whereClause = safeEmployeeType ? `WHERE s.employee_type = ${db.escape(safeEmployeeType)}` : '';
+    const params = [];
+
+    // Get all departments with their attendance counts and employee details
+    const [departments] = await db.query(`
+      SELECT 
+        h.id as hod_id,
+        h.name as hod_name,
+        h.department,
+        COUNT(DISTINCT s.id) as total_emp,
+        COUNT(CASE WHEN a.status = 'present' AND (a.check_in IS NULL OR TIME(a.check_in) <= '10:30:00') THEN 1 END) as present,
+        COUNT(CASE WHEN a.status = 'absent' THEN 1 END) as absent,
+        COUNT(CASE WHEN a.status = 'late' OR (a.status = 'present' AND a.check_in IS NOT NULL AND TIME(a.check_in) > '10:30:00') THEN 1 END) as late,
+        COUNT(CASE WHEN a.status = 'leave' OR a.status = 'on_leave' THEN 1 END) as emp_leave
+      FROM hods h
+      LEFT JOIN staff s ON s.hod_id = h.id
+      LEFT JOIN attendance a ON a.staff_id = s.id${attendanceJoinFilter}
+      ${whereClause}
+      GROUP BY h.id, h.name, h.department
+      ORDER BY h.department
+    `, params);
+
+    // Get detailed employee list for each status in each department
+    const [employees] = await db.query(`
+      SELECT 
+        h.id as hod_id,
+        h.department,
+        s.id as staff_id,
+        s.name as staff_name,
+        s.employee_id,
+        s.designation,
+        s.phone,
+        s.employee_type,
+        a.status,
+        a.check_in,
+        a.check_out,
+        a.date,
+        a.remarks,
+        CASE 
+          WHEN a.status = 'late' THEN 'late'
+          WHEN a.status = 'present' AND a.check_in IS NOT NULL AND TIME(a.check_in) > '10:30:00' THEN 'late'
+          WHEN a.status = 'present' AND (a.check_in IS NULL OR TIME(a.check_in) <= '10:30:00') THEN 'present'
+          WHEN a.status = 'absent' THEN 'absent'
+          WHEN a.status = 'leave' OR a.status = 'on_leave' THEN 'leave'
+          ELSE a.status
+        END as display_status
+      FROM hods h
+      LEFT JOIN staff s ON s.hod_id = h.id
+      LEFT JOIN attendance a ON a.staff_id = s.id${attendanceJoinFilter}
+      ${whereClause}
+      ORDER BY h.department, s.name
+    `, params);
+
+    // Organize employees by department and status
+    const departmentData = departments.map(dept => {
+      const deptEmployees = employees.filter(e => e.hod_id === dept.hod_id);
+      
+      return {
+        ...dept,
+        employees: {
+          total: deptEmployees,
+          present: deptEmployees.filter(e => e.display_status === 'present'),
+          absent: deptEmployees.filter(e => e.display_status === 'absent'),
+          late: deptEmployees.filter(e => e.display_status === 'late'),
+          leave: deptEmployees.filter(e => e.display_status === 'leave')
+        }
+      };
+    });
+
+    res.json(departmentData);
+  } catch (error) {
+    console.error('Department-wise attendance error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get filtered attendance records
 router.get('/filtered', async (req, res) => {
   try {
-    const { start_date, end_date, hod_id, status, period, employee_type } = req.query;
+    const { start_date, end_date, hod_id, department, status, period, employee_type } = req.query;
     
     let whereClause = '1=1';
     let params = [];
@@ -304,6 +410,11 @@ router.get('/filtered', async (req, res) => {
     if (hod_id) {
       whereClause += ' AND a.hod_id = ?';
       params.push(hod_id);
+    }
+
+    if (department) {
+      whereClause += ' AND h.department = ?';
+      params.push(department);
     }
 
     if (employee_type && employee_type !== 'all') {

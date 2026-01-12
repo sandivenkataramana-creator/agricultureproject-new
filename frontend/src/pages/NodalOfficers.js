@@ -245,6 +245,7 @@ const NodalOfficers = () => {
           <table>
             <thead>
               <tr>
+                <th>SNO</th>
                 <th>Name</th>
                 <th>Designation</th>
                 <th>Scheme</th>
@@ -261,7 +262,7 @@ const NodalOfficers = () => {
               </tr>
             </thead>
             <tbody>
-              {officers.slice(currentPage * pageSize, (currentPage + 1) * pageSize).map((officer) => {
+              {officers.slice(currentPage * pageSize, (currentPage + 1) * pageSize).map((officer, index) => {
                 const startDate = officer.start_date ? new Date(officer.start_date).toLocaleDateString() : '-';
                 const endDate = officer.end_date ? new Date(officer.end_date).toLocaleDateString() : '-';
                 const totalDays = officer.total_days ?? (officer.start_date && officer.end_date
@@ -269,6 +270,7 @@ const NodalOfficers = () => {
                   : '-');
                 return (
                 <tr key={officer.id}>
+                  <td><strong>{currentPage * pageSize + index + 1}</strong></td>
                   <td>{officer.name}</td>
                   <td>{officer.designation}</td>
                   <td>{officer.scheme_name}</td>

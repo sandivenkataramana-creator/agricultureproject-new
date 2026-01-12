@@ -613,7 +613,7 @@ router.get('/revenue/all', async (req, res) => {
         revenue,
         financial_year,
         status
-       FROM revenue_financials
+       FROM revenue
        WHERE financial_year = ? AND status = 'active'
        ORDER BY cooperative_name`,
       [year]
@@ -639,7 +639,7 @@ router.post('/revenue', async (req, res) => {
     } = req.body;
 
     const [result] = await db.query(
-      `INSERT INTO revenue_financials (
+      `INSERT INTO revenue (
         cooperative_name, loans, revenue, financial_year, status
       ) VALUES (?, ?, ?, ?, ?)`,
       [
@@ -671,7 +671,7 @@ router.put('/revenue/:id', async (req, res) => {
     } = req.body;
 
     const [result] = await db.query(
-      `UPDATE revenue_financials SET 
+      `UPDATE revenue SET 
         cooperative_name = ?, loans = ?, revenue = ?, financial_year = ?, status = ?
        WHERE id = ?`,
       [
@@ -694,7 +694,7 @@ router.put('/revenue/:id', async (req, res) => {
 // Delete revenue entry
 router.delete('/revenue/:id', async (req, res) => {
   try {
-    await db.query('DELETE FROM revenue_financials WHERE id = ?', [req.params.id]);
+    await db.query('DELETE FROM revenue WHERE id = ?', [req.params.id]);
     res.json({ message: 'Revenue entry deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });

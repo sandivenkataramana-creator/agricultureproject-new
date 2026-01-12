@@ -11,10 +11,11 @@ router.get('/', async (req, res) => {
     let results;
     try {
       [results] = await db.query(`
-        SELECT b.*, h.name as hod_name, s.scheme_name as scheme_name, st.name as state_name, d.name as district_name, m.name as mandal_name
+        SELECT b.*, h.name as hod_name, h.department as department, s.scheme_name as scheme_name, st.name as state_name, d.name as district_name, m.name as mandal_name, da.name as dao_name
         FROM budget b
         LEFT JOIN hods h ON b.hod_id = h.id
         LEFT JOIN schemes s ON b.scheme_id = s.id
+        LEFT JOIN dao da ON b.dao_id = da.id
         LEFT JOIN states st ON b.state_id = st.id
         LEFT JOIN districts d ON b.district_id = d.id
         LEFT JOIN mandals m ON b.mandal_id = m.id
@@ -35,10 +36,11 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const [results] = await db.query(`
-      SELECT b.*, h.name as hod_name, s.scheme_name as scheme_name, st.name as state_name, d.name as district_name, m.name as mandal_name
+      SELECT b.*, h.name as hod_name, h.department as department, s.scheme_name as scheme_name, st.name as state_name, d.name as district_name, m.name as mandal_name, da.name as dao_name
       FROM budget b 
       LEFT JOIN hods h ON b.hod_id = h.id 
       LEFT JOIN schemes s ON b.scheme_id = s.id 
+      LEFT JOIN dao da ON b.dao_id = da.id
       LEFT JOIN states st ON b.state_id = st.id
       LEFT JOIN districts d ON b.district_id = d.id
       LEFT JOIN mandals m ON b.mandal_id = m.id
@@ -57,9 +59,10 @@ router.get('/:id', async (req, res) => {
 router.get('/hod/:hodId', async (req, res) => {
   try {
     const [results] = await db.query(`
-      SELECT b.*, s.scheme_name as scheme_name, st.name as state_name, d.name as district_name, m.name as mandal_name
+      SELECT b.*, s.scheme_name as scheme_name, st.name as state_name, d.name as district_name, m.name as mandal_name, da.name as dao_name
       FROM budget b 
       LEFT JOIN schemes s ON b.scheme_id = s.id 
+      LEFT JOIN dao da ON b.dao_id = da.id
       LEFT JOIN states st ON b.state_id = st.id
       LEFT JOIN districts d ON b.district_id = d.id
       LEFT JOIN mandals m ON b.mandal_id = m.id
@@ -93,10 +96,10 @@ router.get('/summary/overview', async (req, res) => {
 // Create budget entry
 router.post('/', ...superAdminOnly, async (req, res) => {
   try {
-    const { hod_id, scheme_id, financial_year, allocated_amount, utilized_amount, category, description, state_id, district_id, mandal_id, village } = req.body;
+    const { hod_id, scheme_id, financial_year, allocated_amount, utilized_amount, category, description, dao_id, section, budget_estimation_state, budget_estimation_central, budget_sanction_state, budget_sanction_central, budget_remaining_state, budget_remaining_central, budget_pending_state, budget_pending_central, state_id, district_id, mandal_id, village } = req.body;
     const [result] = await db.query(
-      'INSERT INTO budget (hod_id, scheme_id, financial_year, allocated_amount, utilized_amount, category, description, state_id, district_id, mandal_id, village) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [hod_id, scheme_id, financial_year, allocated_amount || 0, utilized_amount || 0, category, description, state_id || null, district_id || null, mandal_id || null, village || null]
+      'INSERT INTO budget (hod_id, scheme_id, financial_year, allocated_amount, utilized_amount, category, description, dao_id, section, budget_estimation_state, budget_estimation_central, budget_sanction_state, budget_sanction_central, budget_remaining_state, budget_remaining_central, budget_pending_state, budget_pending_central, state_id, district_id, mandal_id, village) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [hod_id, scheme_id, financial_year, allocated_amount || 0, utilized_amount || 0, category, description, dao_id || null, section || null, budget_estimation_state ?? null, budget_estimation_central ?? null, budget_sanction_state ?? null, budget_sanction_central ?? null, budget_remaining_state ?? null, budget_remaining_central ?? null, budget_pending_state ?? null, budget_pending_central ?? null, state_id || null, district_id || null, mandal_id || null, village || null]
     );
     res.status(201).json({ id: result.insertId, message: 'Budget entry created successfully' });
   } catch (error) {
@@ -107,10 +110,10 @@ router.post('/', ...superAdminOnly, async (req, res) => {
 // Update budget entry
 router.put('/:id', ...superAdminOnly, async (req, res) => {
   try {
-    const { hod_id, scheme_id, financial_year, allocated_amount, utilized_amount, category, description, state_id, district_id, mandal_id, village } = req.body;
+    const { hod_id, scheme_id, financial_year, allocated_amount, utilized_amount, category, description, dao_id, section, budget_estimation_state, budget_estimation_central, budget_sanction_state, budget_sanction_central, budget_remaining_state, budget_remaining_central, budget_pending_state, budget_pending_central, state_id, district_id, mandal_id, village } = req.body;
     await db.query(
-      'UPDATE budget SET hod_id = ?, scheme_id = ?, financial_year = ?, allocated_amount = ?, utilized_amount = ?, category = ?, description = ?, state_id = ?, district_id = ?, mandal_id = ?, village = ? WHERE id = ?',
-      [hod_id, scheme_id, financial_year, allocated_amount, utilized_amount, category, description, state_id || null, district_id || null, mandal_id || null, village || null, req.params.id]
+      'UPDATE budget SET hod_id = ?, scheme_id = ?, financial_year = ?, allocated_amount = ?, utilized_amount = ?, category = ?, description = ?, dao_id = ?, section = ?, budget_estimation_state = ?, budget_estimation_central = ?, budget_sanction_state = ?, budget_sanction_central = ?, budget_remaining_state = ?, budget_remaining_central = ?, budget_pending_state = ?, budget_pending_central = ?, state_id = ?, district_id = ?, mandal_id = ?, village = ? WHERE id = ?',
+      [hod_id, scheme_id, financial_year, allocated_amount, utilized_amount, category, description, dao_id || null, section || null, budget_estimation_state ?? null, budget_estimation_central ?? null, budget_sanction_state ?? null, budget_sanction_central ?? null, budget_remaining_state ?? null, budget_remaining_central ?? null, budget_pending_state ?? null, budget_pending_central ?? null, state_id || null, district_id || null, mandal_id || null, village || null, req.params.id]
     );
     res.json({ message: 'Budget entry updated successfully' });
   } catch (error) {

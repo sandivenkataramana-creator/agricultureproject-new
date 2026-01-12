@@ -171,7 +171,7 @@ const Staff = () => {
       <div className="table-card">
         <div className="table-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <div>Total records: <strong>{filteredStaff.length}</strong> | Showing {Math.min(currentPage * pageSize + 1, filteredStaff.length)}-{Math.min((currentPage + 1) * pageSize, filteredStaff.length)} of {filteredStaff.length}</div>
+            <div>Total records: <strong>{filteredStaff.length}</strong> </div>
             <div className="filter-group" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <label htmlFor="hodFilter" style={{ fontSize: '14px', fontWeight: 'normal' }}>Filter by HOD:</label>
               <select 
@@ -205,6 +205,7 @@ const Staff = () => {
           <table>
             <thead>
               <tr>
+                <th>SNO</th>
                 <th>Employee ID</th>
                 <th>Name</th>
                 <th>Designation</th>
@@ -216,8 +217,9 @@ const Staff = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredStaff.slice(currentPage * pageSize, (currentPage + 1) * pageSize).map((member) => (
+              {filteredStaff.slice(currentPage * pageSize, (currentPage + 1) * pageSize).map((member, index) => (
                 <tr key={member.id}>
+                  <td><strong>{currentPage * pageSize + index + 1}</strong></td>
                   <td><strong>{member.employee_id}</strong></td>
                   <td>{member.name}</td>
                   <td>{member.designation}</td>

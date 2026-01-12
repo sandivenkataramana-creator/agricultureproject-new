@@ -3,7 +3,8 @@ import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiDownload, FiUpload } from 'react
 
 const DAO = () => {
   const [daos, setDAOs] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ name: '', department: '', email: '', phone: '', status: 'active' });
   const [editingId, setEditingId] = useState(null);
@@ -13,13 +14,33 @@ const DAO = () => {
   const isReadOnly = !isSuperAdmin;
 
   useEffect(() => {
-    // TODO: Fetch DAOs from API
-    // Placeholder data
-    setDAOs([
-      { id: 1, name: 'DAO Officer 1', department: 'Agriculture', email: 'dao1@example.com', phone: '9876543210', status: 'active' },
-      { id: 2, name: 'DAO Officer 2', department: 'Horticulture', email: 'dao2@example.com', phone: '9876543211', status: 'active' },
-    ]);
+    fetchDAOs();
   }, []);
+
+  const fetchDAOs = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:5000/api/dao');
+      if (response.ok) {
+        const data = await response.json();
+        setDAOs(Array.isArray(data) ? data : []);
+        setError(null);
+      } else {
+        throw new Error(`Failed to fetch DAOs: ${response.status}`);
+      }
+    } catch (err) {
+      console.error('Error fetching DAOs:', err);
+      setError('Failed to fetch DAO data. Please make sure the server is running.');
+      setDAOs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getAuthHeaders = () => {
+    const token = user?.token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
 
   const handleOpenModal = (dao = null) => {
     if (isReadOnly) return;
@@ -46,20 +67,55 @@ const DAO = () => {
 
   const handleSave = async () => {
     if (isReadOnly) return;
-    // TODO: Call API to save DAO
-    if (editingId) {
-      setDAOs(daos.map(d => d.id === editingId ? { ...formData, id: editingId } : d));
-    } else {
-      setDAOs([...daos, { ...formData, id: Date.now() }]);
+    try {
+      if (editingId) {
+        // Update DAO
+        const response = await fetch(`http://localhost:5000/api/dao/${editingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify(formData)
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to update DAO: ${response.status}`);
+        }
+        alert('DAO updated successfully');
+      } else {
+        // Create DAO
+        const response = await fetch('http://localhost:5000/api/dao', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify(formData)
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to create DAO: ${response.status}`);
+        }
+        alert('DAO created successfully');
+      }
+      fetchDAOs();
+      handleCloseModal();
+    } catch (err) {
+      console.error('Error saving DAO:', err);
+      alert('Failed to save DAO. Please try again.');
     }
-    handleCloseModal();
   };
 
   const handleDelete = async (id) => {
     if (isReadOnly) return;
     if (window.confirm('Are you sure you want to delete this DAO?')) {
-      // TODO: Call API to delete DAO
-      setDAOs(daos.filter(d => d.id !== id));
+      try {
+        const response = await fetch(`http://localhost:5000/api/dao/${id}`, {
+          method: 'DELETE',
+          headers: { ...getAuthHeaders() }
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to delete DAO: ${response.status}`);
+        }
+        alert('DAO deleted successfully');
+        fetchDAOs();
+      } catch (err) {
+        console.error('Error deleting DAO:', err);
+        alert('Failed to delete DAO. Please try again.');
+      }
     }
   };
 
@@ -69,9 +125,24 @@ const DAO = () => {
     dao.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  if (loading) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+        <div style={{ marginBottom: '20px' }}>Loading DAOs...</div>
+        <div style={{ display: 'inline-block', width: '40px', height: '40px', border: '4px solid #ddd', borderTop: '4px solid #0d47a1', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
+
   return (
     <div className="page dao-page">
       <h2>District Agriculture Officers (DAO)</h2>
+
+      {error && (
+        <div style={{ padding: '12px 16px', backgroundColor: '#ffebee', color: '#c62828', borderRadius: '8px', marginBottom: '20px' }}>
+          {error}
+        </div>
+      )}
 
       {/* Action Bar */}
       <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
@@ -118,6 +189,7 @@ const DAO = () => {
           <table>
             <thead>
               <tr>
+                <th>SNO</th>
                 <th>Name</th>
                 <th>Department</th>
                 <th>Email</th>
@@ -128,8 +200,9 @@ const DAO = () => {
             </thead>
             <tbody>
               {filteredDAOs.length > 0 ? (
-                filteredDAOs.map(dao => (
+                filteredDAOs.map((dao, index) => (
                   <tr key={dao.id}>
+                    <td><strong>{index + 1}</strong></td>
                     <td>{dao.name}</td>
                     <td>{dao.department}</td>
                     <td>{dao.email}</td>
@@ -175,7 +248,7 @@ const DAO = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '20px' }}>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '20px' }}>
                     No DAOs found
                   </td>
                 </tr>

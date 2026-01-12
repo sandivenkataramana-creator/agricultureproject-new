@@ -12,7 +12,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
-import { getBudget, createBudget, updateBudget, deleteBudget, getHODs, getSchemes, getStates, getDistrictsByState, getMandalsByDistrict, getVillagesByMandal, getVillagesByDistrict, getCategories } from '../services/api';
+import { getBudget, createBudget, updateBudget, deleteBudget, getHODs, getSchemes, getStates, getDistrictsByState, getMandalsByDistrict, getVillagesByMandal, getVillagesByDistrict, getCategories, getDAOs } from '../services/api';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -25,6 +25,7 @@ const Budget = () => {
   const [mandals, setMandals] = useState([]);
   const [villages, setVillages] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [daos, setDaos] = useState([]);
   const [filters, setFilters] = useState({ hod_id: '', category: '', state_id: '', district_id: '', mandal_id: '', village: '' });
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -41,6 +42,16 @@ const Budget = () => {
     financial_year: '',
     allocated_amount: '',
     utilized_amount: '',
+    dao_id: '',
+    section: '',
+    budget_estimation_state: '',
+    budget_estimation_central: '',
+    budget_sanction_state: '',
+    budget_sanction_central: '',
+    budget_remaining_state: '',
+    budget_remaining_central: '',
+    budget_pending_state: '',
+    budget_pending_central: '',
     state_id: '',
     district_id: '',
     mandal_id: '',
@@ -57,12 +68,13 @@ const Budget = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [budgetRes, hodsRes, schemesRes, categoriesRes, statesRes] = await Promise.all([
+      const [budgetRes, hodsRes, schemesRes, categoriesRes, statesRes, daosRes] = await Promise.all([
         getBudget(),
         getHODs(),
         getSchemes(),
         getCategories(),
-        getStates()
+        getStates(),
+        getDAOs()
       ]);
       // Enrich budgets with location names if missing
       const budgetsRaw = budgetRes.data || [];
@@ -122,6 +134,7 @@ const Budget = () => {
       setSchemes(schemesRes.data || []);
       setCategories(categoriesRes.data || []);
       setStates(statesRes.data || []);
+      setDaos(daosRes.data || []);
       setError(null);
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -288,6 +301,16 @@ const Budget = () => {
         financial_year: budget.financial_year || '',
         allocated_amount: budget.allocated_amount || '',
         utilized_amount: budget.utilized_amount || '',
+        dao_id: budget.dao_id || '',
+        section: budget.section || '',
+        budget_estimation_state: budget.budget_estimation_state ?? '',
+        budget_estimation_central: budget.budget_estimation_central ?? '',
+        budget_sanction_state: budget.budget_sanction_state ?? '',
+        budget_sanction_central: budget.budget_sanction_central ?? '',
+        budget_remaining_state: budget.budget_remaining_state ?? '',
+        budget_remaining_central: budget.budget_remaining_central ?? '',
+        budget_pending_state: budget.budget_pending_state ?? '',
+        budget_pending_central: budget.budget_pending_central ?? '',
         state_id: budget.state_id || '',
         district_id: budget.district_id || '',
         mandal_id: budget.mandal_id || '',
@@ -309,7 +332,7 @@ const Budget = () => {
       }
     } else {
       setEditingBudget(null);
-      setFormData({ hod_id: '', scheme_id: '', category: '', description: '', financial_year: '', allocated_amount: '', utilized_amount: '', state_id: '', district_id: '', mandal_id: '', village: '' });
+      setFormData({ hod_id: '', scheme_id: '', category: '', description: '', financial_year: '', allocated_amount: '', utilized_amount: '', dao_id: '', section: '', budget_estimation_state: '', budget_estimation_central: '', budget_sanction_state: '', budget_sanction_central: '', budget_remaining_state: '', budget_remaining_central: '', budget_pending_state: '', budget_pending_central: '', state_id: '', district_id: '', mandal_id: '', village: '' });
       setDistricts([]);
       setMandals([]);
     }
@@ -335,6 +358,16 @@ const Budget = () => {
         scheme_id: Number(formData.scheme_id),
         allocated_amount: Number(formData.allocated_amount),
         utilized_amount: Number(formData.utilized_amount) || 0,
+        dao_id: formData.dao_id ? Number(formData.dao_id) : null,
+        section: formData.section || null,
+        budget_estimation_state: formData.budget_estimation_state === '' ? null : Number(formData.budget_estimation_state),
+        budget_estimation_central: formData.budget_estimation_central === '' ? null : Number(formData.budget_estimation_central),
+        budget_sanction_state: formData.budget_sanction_state === '' ? null : Number(formData.budget_sanction_state),
+        budget_sanction_central: formData.budget_sanction_central === '' ? null : Number(formData.budget_sanction_central),
+        budget_remaining_state: formData.budget_remaining_state === '' ? null : Number(formData.budget_remaining_state),
+        budget_remaining_central: formData.budget_remaining_central === '' ? null : Number(formData.budget_remaining_central),
+        budget_pending_state: formData.budget_pending_state === '' ? null : Number(formData.budget_pending_state),
+        budget_pending_central: formData.budget_pending_central === '' ? null : Number(formData.budget_pending_central),
         state_id: formData.state_id || null,
         district_id: formData.district_id || null,
         mandal_id: formData.mandal_id || null,
@@ -580,38 +613,66 @@ const Budget = () => {
           <table>
             <thead>
               <tr>
-                <th>HOD</th>
-                <th>Scheme</th>
-                <th>Category</th>
+                <th rowSpan="2">SNO</th>
+                <th rowSpan="2">Department</th>
+                <th rowSpan="2">DAO</th>
+                <th rowSpan="2">Section</th>
+                <th rowSpan="2">HOD</th>
+                <th rowSpan="2">Scheme</th>
+                <th rowSpan="2">Category</th>
+                <th rowSpan="2">District</th>
+                <th rowSpan="2">Mandal</th>
+                <th rowSpan="2">Village</th>
+                <th rowSpan="2">Description</th>
+                <th rowSpan="2">Financial Year</th>
+
+                <th colSpan="2">Budget Estimation</th>
+                <th colSpan="2">Budget Sanction</th>
+                <th colSpan="2">Budget Remaining</th>
+                <th colSpan="2">Budget Pending</th>
+
+                <th rowSpan="2">Budget Utilized (HOD)</th>
+                <th rowSpan="2">Budget Remaining (HOD)</th>
+                <th rowSpan="2">Actions</th>
+              </tr>
+              <tr>
                 <th>State</th>
-                <th>District</th>
-                <th>Mandal</th>
-                <th>Village</th>
-                <th>Description</th>
-                <th>Financial Year</th>
-                <th>Allocated</th>
-                <th>Utilized</th>
-                <th>Remaining</th>
-                <th>Actions</th>
+                <th>Central</th>
+                <th>State</th>
+                <th>Central</th>
+                <th>State</th>
+                <th>Central</th>
+                <th>State</th>
+                <th>Central</th>
               </tr>
             </thead>
             <tbody>
-              {filteredBudgets.slice(currentPage * pageSize, (currentPage + 1) * pageSize).map((budget) => {
+              {filteredBudgets.slice(currentPage * pageSize, (currentPage + 1) * pageSize).map((budget, index) => {
                 const allocated = parseFloat(budget.allocated_amount) || 0;
                 const utilized = parseFloat(budget.utilized_amount) || 0;
                 const remaining = allocated - utilized;
                 return (
                   <tr key={budget.id}>
+                    <td>{currentPage * pageSize + index + 1}</td>
+                    <td>{budget.department || budget.hod_department || 'N/A'}</td>
+                    <td>{budget.dao_name || 'N/A'}</td>
+                    <td>{budget.section || 'N/A'}</td>
                     <td>{budget.hod_name || 'N/A'}</td>
                     <td>{budget.scheme_name || 'N/A'}</td>
-                    <td>{budget.category}</td>
-                    <td>{budget.state_name || 'N/A'}</td>
+                    <td>{budget.category || 'N/A'}</td>
                     <td>{budget.district_name || 'N/A'}</td>
                     <td>{budget.mandal_name || 'N/A'}</td>
                     <td>{budget.village || 'N/A'}</td>
-                    <td>{budget.description}</td>
-                    <td>{budget.financial_year}</td>
-                    <td>{formatCurrency(allocated)}</td>
+                    <td>{budget.description || 'N/A'}</td>
+                    <td>{budget.financial_year || 'N/A'}</td>
+                    <td>{budget.budget_estimation_state == null ? 'N/A' : formatCurrency(budget.budget_estimation_state)}</td>
+                    <td>{budget.budget_estimation_central == null ? 'N/A' : formatCurrency(budget.budget_estimation_central)}</td>
+                    <td>{budget.budget_sanction_state == null ? 'N/A' : formatCurrency(budget.budget_sanction_state)}</td>
+                    <td>{budget.budget_sanction_central == null ? 'N/A' : formatCurrency(budget.budget_sanction_central)}</td>
+                    <td>{budget.budget_remaining_state == null ? 'N/A' : formatCurrency(budget.budget_remaining_state)}</td>
+                    <td>{budget.budget_remaining_central == null ? 'N/A' : formatCurrency(budget.budget_remaining_central)}</td>
+                    <td>{budget.budget_pending_state == null ? 'N/A' : formatCurrency(budget.budget_pending_state)}</td>
+                    <td>{budget.budget_pending_central == null ? 'N/A' : formatCurrency(budget.budget_pending_central)}</td>
                     <td>{formatCurrency(utilized)}</td>
                     <td style={{ color: remaining >= 0 ? 'var(--secondary-color)' : 'var(--danger-color)', fontWeight: '600' }}>
                       {formatCurrency(remaining)}
@@ -714,12 +775,57 @@ const Budget = () => {
             <textarea name="description" value={formData.description} onChange={handleChange} placeholder="Enter description" rows={3}></textarea>
           </div>
           <div className="form-group">
-            <label>Allocated Amount (₹)</label>
+            <label>Budget Sanction (HOD) (₹)</label>
             <input type="number" name="allocated_amount" value={formData.allocated_amount} onChange={handleChange} required />
           </div>
           <div className="form-group">
-            <label>Utilized Amount (₹)</label>
+            <label>Budget Utilized (HOD) (₹)</label>
             <input type="number" name="utilized_amount" value={formData.utilized_amount} onChange={handleChange} />
+          </div>
+          <div className="form-group">
+            <label>DAO</label>
+            <select name="dao_id" value={formData.dao_id} onChange={handleChange}>
+              <option value="">Select DAO</option>
+              {daos.map(dao => (
+                <option key={dao.id} value={dao.id}>{dao.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Section</label>
+            <input type="text" name="section" value={formData.section} onChange={handleChange} placeholder="Enter section" />
+          </div>
+          <div className="form-group">
+            <label>Budget Estimation (State) (₹)</label>
+            <input type="number" name="budget_estimation_state" value={formData.budget_estimation_state} onChange={handleChange} />
+          </div>
+          <div className="form-group">
+            <label>Budget Estimation (Central) (₹)</label>
+            <input type="number" name="budget_estimation_central" value={formData.budget_estimation_central} onChange={handleChange} />
+          </div>
+          <div className="form-group">
+            <label>Budget Sanction (State) (₹)</label>
+            <input type="number" name="budget_sanction_state" value={formData.budget_sanction_state} onChange={handleChange} />
+          </div>
+          <div className="form-group">
+            <label>Budget Sanction (Central) (₹)</label>
+            <input type="number" name="budget_sanction_central" value={formData.budget_sanction_central} onChange={handleChange} />
+          </div>
+          <div className="form-group">
+            <label>Budget Remaining (State) (₹)</label>
+            <input type="number" name="budget_remaining_state" value={formData.budget_remaining_state} onChange={handleChange} />
+          </div>
+          <div className="form-group">
+            <label>Budget Remaining (Central) (₹)</label>
+            <input type="number" name="budget_remaining_central" value={formData.budget_remaining_central} onChange={handleChange} />
+          </div>
+          <div className="form-group">
+            <label>Budget Pending (State) (₹)</label>
+            <input type="number" name="budget_pending_state" value={formData.budget_pending_state} onChange={handleChange} />
+          </div>
+          <div className="form-group">
+            <label>Budget Pending (Central) (₹)</label>
+            <input type="number" name="budget_pending_central" value={formData.budget_pending_central} onChange={handleChange} />
           </div>
           <div className="form-group">
             <label>State</label>

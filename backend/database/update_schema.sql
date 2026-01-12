@@ -41,6 +41,19 @@ ADD COLUMN IF NOT EXISTS district_id INT,
 ADD COLUMN IF NOT EXISTS mandal_id INT,
 ADD COLUMN IF NOT EXISTS village VARCHAR(255);
 
+-- Add budget breakdown + DAO/section fields to budget table if they don't exist
+ALTER TABLE budget
+ADD COLUMN IF NOT EXISTS dao_id INT,
+ADD COLUMN IF NOT EXISTS section VARCHAR(255),
+ADD COLUMN IF NOT EXISTS budget_estimation_state DECIMAL(15, 2) DEFAULT 0,
+ADD COLUMN IF NOT EXISTS budget_estimation_central DECIMAL(15, 2) DEFAULT 0,
+ADD COLUMN IF NOT EXISTS budget_sanction_state DECIMAL(15, 2) DEFAULT 0,
+ADD COLUMN IF NOT EXISTS budget_sanction_central DECIMAL(15, 2) DEFAULT 0,
+ADD COLUMN IF NOT EXISTS budget_remaining_state DECIMAL(15, 2) DEFAULT 0,
+ADD COLUMN IF NOT EXISTS budget_remaining_central DECIMAL(15, 2) DEFAULT 0,
+ADD COLUMN IF NOT EXISTS budget_pending_state DECIMAL(15, 2) DEFAULT 0,
+ADD COLUMN IF NOT EXISTS budget_pending_central DECIMAL(15, 2) DEFAULT 0;
+
 -- Add additional details to nodal_officers if they don't exist
 ALTER TABLE nodal_officers 
 ADD COLUMN IF NOT EXISTS purpose VARCHAR(255),

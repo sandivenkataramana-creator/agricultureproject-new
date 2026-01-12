@@ -157,6 +157,7 @@ const HODs = () => {
           <table>
             <thead>
               <tr style={{ display: 'table-row', verticalAlign: 'inherit', unicodeBidi: 'isolate', borderColor: 'inherit' }}>
+                <th>SNO</th>
                 <th>Name</th>
                 <th>Department</th>
                 <th>Category</th>
@@ -167,8 +168,9 @@ const HODs = () => {
               </tr>
             </thead>
             <tbody>
-              {hods.slice(currentPage * pageSize, (currentPage + 1) * pageSize).map((hod) => (
+              {hods.slice(currentPage * pageSize, (currentPage + 1) * pageSize).map((hod, index) => (
                 <tr key={hod.id}>
+                  <td><strong>{currentPage * pageSize + index + 1}</strong></td>
                   <td>{hod.name}</td>
                   <td>{hod.department}</td>
                   <td>{hod.category_name}</td>
