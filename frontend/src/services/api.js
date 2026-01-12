@@ -43,7 +43,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       // List of public endpoints
-      const publicEndpoints = ['/nodal-officers', '/programs'];
+      const publicEndpoints = ['/nodal-officers'];
       const isPublicEndpoint = publicEndpoints.some(endpoint => 
         error.config.url && error.config.url.includes(endpoint)
       );
@@ -72,6 +72,9 @@ export const getCurrentUser = (userId) => api.get(`/auth/me?userId=${userId}`);
 // Dashboard
 export const getDashboardStats = (params = {}) => api.get('/dashboard/stats', { params });
 export const getDashboardQuickStats = (params = {}) => api.get('/dashboard/quick-stats', { params });
+export const getDashboardSchemesSummary = (params = {}) => api.get('/dashboard/schemes-summary', { params });
+export const getDashboardBudgetSummary = (params = {}) => api.get('/dashboard/budget-summary', { params });
+export const getDashboardBudgetBreakdown = (params = {}) => api.get('/dashboard/budget-breakdown', { params });
 export const getSchemesByCategory = (params = {}) => api.get('/dashboard/schemes-by-category', { params });
 export const getHODsByDepartment = (params = {}) => api.get('/dashboard/hods-by-department', { params });
 export const getBudgetByHOD = (params = {}) => api.get('/dashboard/budget-by-hod', { params });
@@ -141,6 +144,9 @@ export const importBeneficiaries = (formData) => api.post('/beneficiaries/import
 export const getImportJobStatus = (jobId) => api.get(`/beneficiaries/import/${jobId}/status`);
 export const getBeneficiariesSummary = (params) => api.get('/beneficiaries/summary', { params });
 
+// DAO
+export const getDAOs = () => api.get('/dao');
+
 // Scheme Budget Allocations
 export const getSchemeBudgetAllocations = () => api.get('/schemes/budget-allocations/all');
 export const getSchemeBudgetAllocationsByScheme = (schemeId) => api.get(`/schemes/${schemeId}/budget-allocations`);
@@ -188,6 +194,7 @@ export const getAttendanceByHODId = (hodId) => api.get(`/attendance/hod/${hodId}
 export const getAttendanceSummaryByHOD = () => api.get('/attendance/summary/by-hod');
 export const getAttendanceStatistics = (params = {}) => api.get('/attendance/statistics', { params });
 export const getAttendanceFiltered = (params = {}) => api.get('/attendance/filtered', { params });
+export const getDepartmentWiseAttendance = (params = {}) => api.get('/attendance/department-wise', { params });
 export const createAttendance = (data) => api.post('/attendance', data);
 export const updateAttendance = (id, data) => api.put(`/attendance/${id}`, data);
 export const deleteAttendance = (id) => api.delete(`/attendance/${id}`);
@@ -200,4 +207,17 @@ export const createRevenue = (data) => api.post('/revenue', data);
 export const updateRevenue = (id, data) => api.put(`/revenue/${id}`, data);
 export const deleteRevenue = (id) => api.delete(`/revenue/${id}`);
 
+// Flagship Programmes
+export const getFlagshipProgrammes = (params = {}) => api.get('/flagship-programmes', { params });
+export const getFlagshipProgrammeById = (id) => api.get(`/flagship-programmes/${id}`);
+export const getFlagshipProgrammesByDepartment = (departmentId) => 
+  api.get(`/flagship-programmes/department/${departmentId}`);
+export const uploadFlagshipData = (data) => api.post('/flagship-programmes/upload', data);
+export const getImportHistory = () => api.get('/flagship-programmes/import-history');
+export const getImportBatchDetails = (batchId) => api.get(`/flagship-programmes/batch/${batchId}`);
+export const deleteFlagshipProgramme = (id) => api.delete(`/flagship-programmes/${id}`);
+export const exportFlagshipProgrammesCSV = (department = '') => 
+  api.get(`/flagship-programmes/export/csv${department ? `?department=${department}` : ''}`);
+
 export default api;
+

@@ -24,6 +24,9 @@ import { HiOutlineUserGroup } from 'react-icons/hi';
 import {
   getDashboardStats,
   getDashboardQuickStats,
+  getDashboardSchemesSummary,
+  getDashboardBudgetSummary,
+  getDashboardBudgetBreakdown,
   getSchemesByCategory,
   getHODsByDepartment,
   getBudgetByHOD,
@@ -84,6 +87,24 @@ const Dashboard = () => {
     beneficiaries: 0,
     attendanceRate: 0,
     nodalOfficers: 0
+  });
+  const [schemesSummary, setSchemesSummary] = useState({
+    year: '',
+    total: { total: 0, central: 0, state: 0 },
+    active: { total: 0, central: 0, state: 0 },
+    inactive: { total: 0, central: 0, state: 0 }
+  });
+  const [budgetSummary, setBudgetSummary] = useState({
+    year: '',
+    total: { total: 0, central: 0, state: 0 },
+    utilized: { total: 0, central: 0, state: 0 },
+    remaining: { total: 0, central: 0, state: 0 }
+  });
+  const [budgetBreakdown, setBudgetBreakdown] = useState({
+    year: '',
+    estimated: { total: 0, central: 0, state: 0 },
+    sanction: { total: 0, central: 0, state: 0 },
+    pending: { total: 0, central: 0, state: 0 }
   });
   const [schemesByCategory, setSchemesByCategory] = useState([]);
   const [hodsByDepartment, setHODsByDepartment] = useState([]);
@@ -176,6 +197,17 @@ const Dashboard = () => {
     if (f.date) params.date = f.date;
     if (f.hod_id) params.hod_id = f.hod_id;
 
+    // Default to current financial year for schemes summary if not explicitly provided
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth() + 1;
+    const fyStart = m >= 4 ? y : y - 1;
+    const currentFY = `${fyStart}-${String(fyStart + 1).slice(2)}`;
+    const schemesSummaryParams = {
+      ...params,
+      year: params.year || currentFY
+    };
+
     try {
       setLoading(true);
       
@@ -183,23 +215,29 @@ const Dashboard = () => {
       const [
         statsRes,
         quickStatsRes,
+        schemesSummaryRes,
+        budgetSummaryRes,
         categoryRes,
         hodsDeptRes,
         budgetRes,
         schemesHODRes,
         attendanceRes,
         revenueRes,
-        revenueDeptRes
+        revenueDeptRes,
+        budgetBreakdownRes
       ] = await Promise.all([
         getDashboardStats(params),
         getDashboardQuickStats(params),
+        getDashboardSchemesSummary(schemesSummaryParams),
+        getDashboardBudgetSummary(schemesSummaryParams),
         getSchemesByCategory(params),
         getHODsByDepartment(params),
         getBudgetByHOD(params),
         getSchemesByHOD(params),
         getAttendanceByHOD(params),
         getRevenueByHOD(params),
-        getRevenueByDepartment(params)
+        getRevenueByDepartment(params),
+        getDashboardBudgetBreakdown(schemesSummaryParams)
       ]);
 
       // Set stats
@@ -237,6 +275,64 @@ const Dashboard = () => {
         nodalOfficers: quickStatsRes.data.nodalOfficers || 0
       });
 
+      // Schemes summary (Central + State)
+      setSchemesSummary({
+        year: schemesSummaryRes.data?.year || schemesSummaryParams.year,
+        total: {
+          total: schemesSummaryRes.data?.total?.total || 0,
+          central: schemesSummaryRes.data?.total?.central || 0,
+          state: schemesSummaryRes.data?.total?.state || 0
+        },
+        active: {
+          total: schemesSummaryRes.data?.active?.total || 0,
+          central: schemesSummaryRes.data?.active?.central || 0,
+          state: schemesSummaryRes.data?.active?.state || 0
+        },
+        inactive: {
+          total: schemesSummaryRes.data?.inactive?.total || 0,
+          central: schemesSummaryRes.data?.inactive?.central || 0,
+          state: schemesSummaryRes.data?.inactive?.state || 0
+        }
+      });
+
+      setBudgetSummary({
+        year: budgetSummaryRes.data?.year || schemesSummaryParams.year,
+        total: {
+          total: budgetSummaryRes.data?.total?.total || 0,
+          central: budgetSummaryRes.data?.total?.central || 0,
+          state: budgetSummaryRes.data?.total?.state || 0
+        },
+        utilized: {
+          total: budgetSummaryRes.data?.utilized?.total || 0,
+          central: budgetSummaryRes.data?.utilized?.central || 0,
+          state: budgetSummaryRes.data?.utilized?.state || 0
+        },
+        remaining: {
+          total: budgetSummaryRes.data?.remaining?.total || 0,
+          central: budgetSummaryRes.data?.remaining?.central || 0,
+          state: budgetSummaryRes.data?.remaining?.state || 0
+        }
+      });
+
+      setBudgetBreakdown({
+        year: budgetBreakdownRes.data?.year || schemesSummaryParams.year,
+        estimated: {
+          total: budgetBreakdownRes.data?.estimated?.total || 0,
+          central: budgetBreakdownRes.data?.estimated?.central || 0,
+          state: budgetBreakdownRes.data?.estimated?.state || 0
+        },
+        sanction: {
+          total: budgetBreakdownRes.data?.sanction?.total || 0,
+          central: budgetBreakdownRes.data?.sanction?.central || 0,
+          state: budgetBreakdownRes.data?.sanction?.state || 0
+        },
+        pending: {
+          total: budgetBreakdownRes.data?.pending?.total || 0,
+          central: budgetBreakdownRes.data?.pending?.central || 0,
+          state: budgetBreakdownRes.data?.pending?.state || 0
+        }
+      });
+
       // Set schemes by category
       setSchemesByCategory(categoryRes.data || []);
 
@@ -264,6 +360,21 @@ const Dashboard = () => {
       setError('Failed to fetch dashboard data. Please make sure the server is running.');
       setLoading(false);
     }
+  };
+
+  const formatCSBreakdown = (central, state) => {
+    return `(C:${central} S:${state})`;
+  };
+
+  const formatCSBudgetBreakdown = (central, state) => {
+    return `(C:${formatCurrency(central)} S:${formatCurrency(state)})`;
+  };
+
+  const formatPercent = (count, total) => {
+    const t = Number(total) || 0;
+    const c = Number(count) || 0;
+    if (t <= 0) return '0%';
+    return `${((c / t) * 100).toFixed(1)}%`;
   };
 
   const formatCurrency = (value) => {
@@ -1800,151 +1911,180 @@ if (!isNaN(safeTotal)) {
       </div> */}
 
       {/* Stats Cards */}
-      <div className="stats-grid">
-        {/* Row 1 - 5 cards */}
-        <div className="stat-card blue" onClick={() => navigate('/hods')} style={{ cursor: 'pointer' }}>
-          <div className="stat-icon blue">
-            <FiUsers />
-          </div>
-          <div className="stat-info">
-            <h3>{stats.totalHods}</h3>
-            <p>Total HODs</p>
-            <div className="trend" style={{ fontSize: '11px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <span onClick={(e) => { e.stopPropagation(); navigate('/hods?status=active'); }} style={{ color: '#4CAF50', cursor: 'pointer' }}>{stats.activeHods} Active</span>
-              <span onClick={(e) => { e.stopPropagation(); navigate('/hods?status=inactive'); }} style={{ color: '#F44336', cursor: 'pointer' }}>{stats.totalHods - stats.activeHods} Inactive</span>
+      <div className="dashboard-top-row">
+        <div className="dashboard-top-left">
+          <div className="dashboard-mini-tiles">
+            <div className="dashboard-mini-tile" style={{ '--from': '#3f87ff', '--to': '#22c1c3' }} onClick={() => navigate('/hods')}>
+              <div className="dashboard-tile-content">
+                <div className="dashboard-tile-label">Total HODs</div>
+                <div className="dashboard-tile-value">{stats.totalHods || 0}</div>
+                <div className="dashboard-tile-sub">{stats.activeHods || 0} Active • {(stats.totalHods || 0) - (stats.activeHods || 0)} Inactive</div>
+              </div>
+              <div className="dashboard-tile-icon" aria-hidden="true"><FiUsers /></div>
             </div>
-          </div>
-        </div>
-        <div className="stat-card green" onClick={() => navigate('/schemes')} style={{ cursor: 'pointer' }}>
-          <div className="stat-icon green">
-            <FiFileText />
-          </div>
-          <div className="stat-info">
-            <h3>{stats.totalSchemes}</h3>
-            <p>Total Schemes</p>
-            <div className="trend" style={{ fontSize: '11px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <span onClick={(e) => { e.stopPropagation(); navigate('/schemes?status=active'); }} style={{ color: '#4CAF50', cursor: 'pointer' }}>{stats.activeSchemes} Active</span>
-              <span onClick={(e) => { e.stopPropagation(); navigate('/schemes?status=inactive'); }} style={{ color: '#F44336', cursor: 'pointer' }}>{stats.totalSchemes - stats.activeSchemes} Inactive</span>
-            </div>
-          </div>
-        </div>
-       
-        <div className="stat-card purple" onClick={() => navigate('/budget')} style={{ cursor: 'pointer' }}>
-          <div className="stat-icon purple">
-            <BiRupee />
-          </div>
-          <div className="stat-info">
-            <h3>{formatCurrency(stats.totalBudget)}</h3>
-            <p>Total Budget</p>
-            <div className="trend up" style={{ fontSize: '12px', color: '#4CAF50' }}>
-              {formatCurrency(stats.utilizedBudget)} Utilized
-            </div>
-          </div>
-        </div>
-        <div className="stat-card light-green" onClick={() => navigate('/budget')} style={{ cursor: 'pointer' }}>
-          <div className="stat-icon" style={{ backgroundColor: '#4CAF50' }}>
-            <FiTrendingUp />
-          </div>
-          <div className="stat-info">
-            <h3>{formatCurrency(quickStats.utilizedBudget)}</h3>
-            <p>Budget Utilized</p>
-            <div className="trend" style={{ fontSize: '11px' }}>
-              <span style={{ color: '#4CAF50' }}>{quickStats.budgetUtilization}% of Total</span>
+
+            <div className="dashboard-mini-tile" style={{ '--from': '#5f72bd', '--to': '#9b23ea' }} onClick={() => navigate('/flagship-programmes')}>
+              <div className="dashboard-tile-content">
+                <div className="dashboard-tile-label">Flagship Programmes</div>
+                <div className="dashboard-tile-value">{stats.totalPrograms || 0}</div>
+                <div className="dashboard-tile-sub">{stats.activePrograms || 0} Active • {stats.inactivePrograms || 0} Inactive</div>
+              </div>
+              <div className="dashboard-tile-icon" aria-hidden="true"><FiActivity /></div>
             </div>
           </div>
         </div>
 
-        {/* Row 2 - 5 cards */}
-        <div className="stat-card light-blue" onClick={() => navigate('/budget')} style={{ cursor: 'pointer' }}>
-          <div className="stat-icon" style={{ backgroundColor: '#2196F3' }}>
-            <BiWallet />
-          </div>
-          <div className="stat-info">
-            <h3>{formatCurrency(quickStats.remainingBudget)}</h3>
-            <p>Remaining Budget</p>
-            <div className="trend" style={{ fontSize: '11px' }}>
-              <span style={{ color: '#2196F3' }}>Available</span>
+        {/* Schemes Summary (Central/State) - right of HOD */}
+        <div className="dashboard-top-right">
+          <div className="schemes-summary-section">
+            <div className="schemes-summary-title">Schemes</div>
+            <div className="schemes-summary-cards">
+              <div className="schemes-summary-card" style={{ '--from': '#43e97b', '--to': '#38f9d7' }} onClick={() => navigate(`/schemes?filterType=central-sponsored-scheme&year=${encodeURIComponent(schemesSummary.year)}`)}>
+                <div className="dashboard-tile-content">
+                  <div className="dashboard-tile-label">Total Schemes</div>
+                  <div className="dashboard-tile-value">{schemesSummary.total.total}</div>
+                  <div className="dashboard-tile-sub">{formatCSBreakdown(schemesSummary.total.central, schemesSummary.total.state)}</div>
+                </div>
+                <div className="dashboard-tile-icon" aria-hidden="true"><FiFileText /></div>
+              </div>
+
+              <div className="schemes-summary-card" style={{ '--from': '#f7971e', '--to': '#ffd200' }} onClick={() => navigate(`/schemes?filterType=central-sponsored-scheme&year=${encodeURIComponent(schemesSummary.year)}`)}>
+                <div className="dashboard-tile-content">
+                  <div className="dashboard-tile-label">Active Schemes</div>
+                  <div className="dashboard-tile-value">{schemesSummary.active.total}</div>
+                  <div className="dashboard-tile-sub">{formatCSBreakdown(schemesSummary.active.central, schemesSummary.active.state)}</div>
+                </div>
+                <div className="dashboard-tile-icon" aria-hidden="true"><FiActivity /></div>
+              </div>
+
+              <div className="schemes-summary-card" style={{ '--from': '#5f72bd', '--to': '#9b23ea' }} onClick={() => navigate(`/schemes?filterType=central-sponsored-scheme&year=${encodeURIComponent(schemesSummary.year)}`)}>
+                <div className="dashboard-tile-content">
+                  <div className="dashboard-tile-label">Inactive Scheme</div>
+                  <div className="dashboard-tile-value">{schemesSummary.inactive.total}</div>
+                  <div className="dashboard-tile-sub">{formatCSBreakdown(schemesSummary.inactive.central, schemesSummary.inactive.state)}</div>
+                </div>
+                <div className="dashboard-tile-icon" aria-hidden="true"><FiClock /></div>
+              </div>
             </div>
           </div>
         </div>
-        <div className="stat-card light-orange" onClick={() => navigate('/locations')} style={{ cursor: 'pointer' }}>
-          <div className="stat-icon" style={{ backgroundColor: '#FF9800' }}>
-            <FiMapPin />
-          </div>
-          <div className="stat-info">
-            <h3>{quickStats.districtsCovered}</h3>
-            <p>Districts Covered</p>
-            <div className="trend" style={{ fontSize: '11px' }}>
-              <span style={{ color: '#FF9800' }}>Telangana</span>
+      </div>
+
+      {/* Attendance Summary (Today) */}
+      <div className="attendance-summary-section">
+        <div className="attendance-summary-title">Attendance (Today)</div>
+        <div className="attendance-summary-cards">
+          <div className="attendance-summary-card" style={{ '--from': '#3f87ff', '--to': '#22c1c3' }} onClick={() => navigate('/staff')}>
+            <div className="dashboard-tile-content">
+              <div className="dashboard-tile-label">Total Emp</div>
+              <div className="dashboard-tile-value">{stats.totalStaff || 0}</div>
+              <div className="dashboard-tile-sub">{formatPercent(stats.totalStaff || 0, stats.totalStaff || 0)}</div>
             </div>
+            <div className="dashboard-tile-icon" aria-hidden="true"><FiUsers /></div>
+          </div>
+
+          <div className="attendance-summary-card" style={{ '--from': '#43e97b', '--to': '#38f9d7' }} onClick={() => navigate('/attendance?period=today') }>
+            <div className="dashboard-tile-content">
+              <div className="dashboard-tile-label">Present</div>
+              <div className="dashboard-tile-value">{stats.todayAttendance?.present || 0}</div>
+              <div className="dashboard-tile-sub">{formatPercent(stats.todayAttendance?.present || 0, stats.totalStaff || 0)}</div>
+            </div>
+            <div className="dashboard-tile-icon" aria-hidden="true"><FiUserCheck /></div>
+          </div>
+
+          <div className="attendance-summary-card" style={{ '--from': '#ff416c', '--to': '#ff4b2b' }} onClick={() => navigate('/attendance?period=today') }>
+            <div className="dashboard-tile-content">
+              <div className="dashboard-tile-label">Absent</div>
+              <div className="dashboard-tile-value">{stats.todayAttendance?.absent || 0}</div>
+              <div className="dashboard-tile-sub">{formatPercent(stats.todayAttendance?.absent || 0, stats.totalStaff || 0)}</div>
+            </div>
+            <div className="dashboard-tile-icon" aria-hidden="true"><FiActivity /></div>
+          </div>
+
+          <div className="attendance-summary-card" style={{ '--from': '#f7971e', '--to': '#ffd200' }} onClick={() => navigate('/attendance?period=today') }>
+            <div className="dashboard-tile-content">
+              <div className="dashboard-tile-label">Late (after 10:30)</div>
+              <div className="dashboard-tile-value">{stats.todayAttendance?.late || 0}</div>
+              <div className="dashboard-tile-sub">{formatPercent(stats.todayAttendance?.late || 0, stats.totalStaff || 0)}</div>
+            </div>
+            <div className="dashboard-tile-icon" aria-hidden="true"><FiClock /></div>
+          </div>
+
+          <div className="attendance-summary-card" style={{ '--from': '#00b09b', '--to': '#96c93d' }} onClick={() => navigate('/attendance?period=today') }>
+            <div className="dashboard-tile-content">
+              <div className="dashboard-tile-label">Emp Leave</div>
+              <div className="dashboard-tile-value">{stats.todayAttendance?.onLeave || 0}</div>
+              <div className="dashboard-tile-sub">{formatPercent(stats.todayAttendance?.onLeave || 0, stats.totalStaff || 0)}</div>
+            </div>
+            <div className="dashboard-tile-icon" aria-hidden="true"><FiMapPin /></div>
           </div>
         </div>
-        <div className="stat-card pink" onClick={() => navigate('/beneficiaries')} style={{ cursor: 'pointer' }}>
-          <div className="stat-icon" style={{ backgroundColor: '#E91E63' }}>
-            <HiOutlineUserGroup />
-          </div>
-          <div className="stat-info">
-            <h3>{formatBeneficiaries(quickStats.beneficiaries)}</h3>
-            <p>Beneficiaries</p>
-            <div className="trend" style={{ fontSize: '11px' }}>
-              <span style={{ color: '#E91E63' }}>Total Enrolled</span>
+      </div>
+
+      {/* Budget Summary (Central/State) */}
+      <div className="budget-summary-section">
+        <div className="budget-summary-title">Budget</div>
+        <div className="budget-summary-cards">
+          <div className="budget-summary-card" style={{ '--from': '#9b23ea', '--to': '#5f72bd' }} onClick={() => navigate('/budget')}>
+            <div className="dashboard-tile-content">
+              <div className="dashboard-tile-label">Total Budget</div>
+              <div className="dashboard-tile-value">{formatCurrency(budgetSummary.total.total)}</div>
+              <div className="dashboard-tile-sub">{formatCSBudgetBreakdown(budgetSummary.total.central, budgetSummary.total.state)}</div>
             </div>
+            <div className="dashboard-tile-icon" aria-hidden="true"><BiRupee /></div>
+          </div>
+
+          <div className="budget-summary-card" style={{ '--from': '#00b09b', '--to': '#96c93d' }} onClick={() => navigate('/budget')}>
+            <div className="dashboard-tile-content">
+              <div className="dashboard-tile-label">Budget Utilized</div>
+              <div className="dashboard-tile-value">{formatCurrency(budgetSummary.utilized.total)}</div>
+              <div className="dashboard-tile-sub">{formatCSBudgetBreakdown(budgetSummary.utilized.central, budgetSummary.utilized.state)}</div>
+            </div>
+            <div className="dashboard-tile-icon" aria-hidden="true"><FiTrendingUp /></div>
+          </div>
+
+          <div className="budget-summary-card" style={{ '--from': '#3f87ff', '--to': '#6a5af9' }} onClick={() => navigate('/budget')}>
+            <div className="dashboard-tile-content">
+              <div className="dashboard-tile-label">Remaining Budget</div>
+              <div className="dashboard-tile-value">{formatCurrency(budgetSummary.remaining.total)}</div>
+              <div className="dashboard-tile-sub">{formatCSBudgetBreakdown(budgetSummary.remaining.central, budgetSummary.remaining.state)}</div>
+            </div>
+            <div className="dashboard-tile-icon" aria-hidden="true"><BiWallet /></div>
           </div>
         </div>
-        <div className="stat-card light-purple" onClick={() => navigate('/nodal-officers')} style={{ cursor: 'pointer' }}>
-          <div className="stat-icon" style={{ backgroundColor: '#9C27B0' }}>
-            <FiUsers />
-          </div>
-          <div className="stat-info">
-            <h3>{quickStats.nodalOfficers || 0}</h3>
-            <p>Nodal Officers</p>
-            <div className="trend" style={{ fontSize: '11px' }}>
-              <span style={{ color: '#9C27B0' }}>Active Officers</span>
+      </div>
+
+      {/* Budget Breakdown (Estimated / Sanction / Pending) */}
+      <div className="budget-summary-section">
+        <div className="budget-summary-title">Budget Breakdown</div>
+        <div className="budget-summary-cards">
+          <div className="budget-summary-card" style={{ '--from': '#f39c12', '--to': '#e67e22' }} onClick={() => navigate('/budget')}>
+            <div className="dashboard-tile-content">
+              <div className="dashboard-tile-label">Estimated Budget</div>
+              <div className="dashboard-tile-value">{formatCurrency(budgetBreakdown.estimated.total)}</div>
+              <div className="dashboard-tile-sub">{formatCSBudgetBreakdown(budgetBreakdown.estimated.central, budgetBreakdown.estimated.state)}</div>
             </div>
+            <div className="dashboard-tile-icon" aria-hidden="true"><BiRupee /></div>
+          </div>
+
+          <div className="budget-summary-card" style={{ '--from': '#27ae60', '--to': '#229954' }} onClick={() => navigate('/budget')}>
+            <div className="dashboard-tile-content">
+              <div className="dashboard-tile-label">Budget Sanction</div>
+              <div className="dashboard-tile-value">{formatCurrency(budgetBreakdown.sanction.total)}</div>
+              <div className="dashboard-tile-sub">{formatCSBudgetBreakdown(budgetBreakdown.sanction.central, budgetBreakdown.sanction.state)}</div>
+            </div>
+            <div className="dashboard-tile-icon" aria-hidden="true"><FiTrendingUp /></div>
+          </div>
+
+          <div className="budget-summary-card" style={{ '--from': '#e74c3c', '--to': '#c0392b' }} onClick={() => navigate('/budget')}>
+            <div className="dashboard-tile-content">
+              <div className="dashboard-tile-label">Pending Budget</div>
+              <div className="dashboard-tile-value">{formatCurrency(budgetBreakdown.pending.total)}</div>
+              <div className="dashboard-tile-sub">{formatCSBudgetBreakdown(budgetBreakdown.pending.central, budgetBreakdown.pending.state)}</div>
+            </div>
+            <div className="dashboard-tile-icon" aria-hidden="true"><BiWallet /></div>
           </div>
         </div>
-        <div className="stat-card teal" onClick={() => navigate('/programs')} style={{ cursor: 'pointer' }}>
-          <div className="stat-icon teal" style={{ backgroundColor: '#00838f' }}>
-            <FiFileText />
-          </div>
-          <div className="stat-info">
-            <h3>{stats.totalPrograms || 0}</h3>
-            <p>Programs</p>
-            <div className="trend" style={{ fontSize: '11px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ color: '#4CAF50' }}>{stats.activePrograms || 0} Active</span>
-              <span style={{ color: '#F44336' }}>•</span>
-              <span style={{ color: '#F44336' }}>{stats.inactivePrograms || 0} Inactive</span>
-            </div>
-          </div>
-        </div>
-         <div className="stat-card orange clickable" onClick={() => navigate('/staff')} style={{ cursor: 'pointer' }}>
-          <div className="stat-icon orange">
-            <FiActivity />
-          </div>
-          <div className="stat-info">
-            <h3>{stats.totalStaff}</h3>
-            <p>Total Staff</p>
-            <div className="trend" style={{ fontSize: '11px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <span onClick={(e) => { e.stopPropagation(); navigate('/staff?status=active'); }} style={{ color: '#4CAF50', cursor: 'pointer' }}>{stats.activeStaff} Active</span>
-              <span onClick={(e) => { e.stopPropagation(); navigate('/attendance?status=leave'); }} style={{ color: '#2196F3', cursor: 'pointer' }}>{stats.todayAttendance?.onLeave || 0} Leave</span>
-            </div>
-          </div>
-        </div>
-        <div className="stat-card cyan" onClick={() => navigate('/attendance')} style={{ cursor: 'pointer' }}>
-          <div className="stat-icon" style={{ backgroundColor: '#009688' }}>
-            <FiActivity />
-          </div>
-          <div className="stat-info">
-            <h3>{stats.todayAttendance?.present || 0}</h3>
-            <p>Today's Attendance</p>
-            <div className="trend" style={{ fontSize: '11px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ color: '#4CAF50' }}>{stats.todayAttendance?.present || 0} Present</span>
-              <span style={{ color: '#F44336' }}>•</span>
-              <span style={{ color: '#2196F3' }}>{stats.todayAttendance?.onLeave || 0} Leave</span>
-            </div>
-          </div>
-        </div>
-        
       </div>
 {/* <div className="stat-card teal" style={{ cursor: 'pointer' }} onClick={() => navigate('/attendance?period=today')}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

@@ -15,7 +15,7 @@ import DAO from './pages/DAO';
 import Schemes from './pages/Schemes';
 import Staff from './pages/Staff';
 import Budget from './pages/Budget';
-import Programs from './pages/Programs';
+import FlagshipProgrammes from './pages/FlagshipProgrammes';
 import KPIs from './pages/KPIs';
 import NodalOfficers from './pages/NodalOfficers';
 import Attendance from './pages/Attendance';
@@ -88,7 +88,7 @@ function App() {
                       <Route path="/schemes" element={<Schemes />} />
                       <Route path="/staff" element={<Staff />} />
                       <Route path="/budget" element={<Budget />} />
-                      <Route path="/programs" element={<Programs />} />
+                      <Route path="/flagship-programmes" element={<FlagshipProgrammes />} />
                       <Route path="/kpis" element={<KPIs />} />
                       <Route path="/nodal-officers" element={<NodalOfficers />} />
                       <Route path="/attendance" element={<Attendance />} />

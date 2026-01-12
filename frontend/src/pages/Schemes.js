@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import Modal from '../components/Modal';
-import { FiPlus, FiFilter, FiUpload, FiEdit2 } from 'react-icons/fi';
+import { FiPlus, FiFilter, FiUpload, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import * as XLSX from 'xlsx';
-import { createScheme, updateScheme, getHODs, getCategories } from '../services/api';
+import { createScheme, updateScheme, deleteScheme, getHODs, getCategories } from '../services/api';
 
 const Schemes = () => {
+  const location = useLocation();
   const [hods, setHods] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState(null); // { type: 'central-sponsored-scheme'|'state-scheme'|'revenue', id }
   const [filterType, setFilterType] = useState('central-sponsored-scheme');
   const [formData, setFormData] = useState({
     name: '',
@@ -53,6 +56,20 @@ const Schemes = () => {
   const fileInputRef = useRef(null);
   const [stateSchemeData, setStateSchemeData] = useState([]);
   const [revenueData, setRevenueData] = useState([]);
+
+  // Support deep-linking from dashboard: /schemes?filterType=state-scheme&year=2025-26
+  useEffect(() => {
+    const sp = new URLSearchParams(location.search);
+    const ft = sp.get('filterType');
+    const yr = sp.get('year');
+
+    if (ft && ['central-sponsored-scheme', 'state-scheme', 'revenue'].includes(ft)) {
+      setFilterType(ft);
+    }
+    if (yr) {
+      setFinancialYear(yr);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     fetchData();
@@ -183,6 +200,7 @@ const fetchCentralSchemes = async (year = financialYear) => {
   };
 
   const handleOpenModal = () => {
+    setEditingItem(null);
     setFormData({ 
       name: '',
       central_scheme_name: '',
@@ -222,6 +240,7 @@ const fetchCentralSchemes = async (year = financialYear) => {
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setEditingItem(null);
     // Reset form data
     setFormData({
       name: '',
@@ -261,6 +280,8 @@ const fetchCentralSchemes = async (year = financialYear) => {
   };
 
   const handleEditScheme = (scheme) => {
+    setFilterType('central-sponsored-scheme');
+    setEditingItem({ type: 'central-sponsored-scheme', id: scheme?.id });
     setFormData({
       name: scheme.scheme_name || '',
       central_scheme_name: scheme.central_scheme_name || '',
@@ -297,6 +318,139 @@ const fetchCentralSchemes = async (year = financialYear) => {
       remark: scheme.remark || ''
     });
     setIsModalOpen(true);
+  };
+
+  const handleEditStateScheme = (row) => {
+    setFilterType('state-scheme');
+    setEditingItem({ type: 'state-scheme', id: row?.id });
+    setFormData({
+      name: row?.name || '',
+      central_scheme_name: '',
+      scheme_description: '',
+      scheme_objective: '',
+      scheme_benefits_desc: '',
+      scheme_benefits_person: '',
+      hod: row?.hod || '',
+      category_id: '',
+      total_budget: '',
+      status: 'PLANNED',
+      scheme_category: '',
+      start_date: '',
+      end_date: '',
+      allocation_goi_share: '',
+      allocation_state_share: '',
+      allocation_total: row?.budgetEstimates ?? '',
+      slsc_goi_share: '',
+      slsc_state_share: '',
+      slsc_total: '',
+      sanction_goi_share: '',
+      sanction_state_share: '',
+      sanction_total: '',
+      bro_released_amount: row?.broReleased ?? '',
+      dt_authorized_amount: '',
+      bills_preferred_count: row?.billsPreferredNo ?? '',
+      bills_preferred_amount: row?.billsPreferredAmount ?? '',
+      oldest_bill_date: row?.billsPreferredOldestDate ?? '',
+      bills_cleared_count: row?.billsClearedNo ?? '',
+      bills_cleared_amount: row?.billsClearedAmount ?? '',
+      latest_bill_date: row?.billsClearedLatestDate ?? '',
+      pending_bills_count: row?.pendingNo ?? '',
+      pending_bills_amount: row?.pendingAmount ?? '',
+      remark: ''
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleEditRevenueEntry = (row) => {
+    setFilterType('revenue');
+    setEditingItem({ type: 'revenue', id: row?.id });
+    setFormData({
+      name: row?.cooperativeName || '',
+      central_scheme_name: '',
+      scheme_description: '',
+      scheme_objective: '',
+      scheme_benefits_desc: '',
+      scheme_benefits_person: '',
+      hod: '',
+      category_id: '',
+      total_budget: '',
+      status: 'PLANNED',
+      scheme_category: '',
+      start_date: '',
+      end_date: '',
+      allocation_goi_share: row?.loans ?? '',
+      allocation_state_share: row?.revenue ?? '',
+      allocation_total: '',
+      slsc_goi_share: '',
+      slsc_state_share: '',
+      slsc_total: '',
+      sanction_goi_share: '',
+      sanction_state_share: '',
+      sanction_total: '',
+      bro_released_amount: '',
+      dt_authorized_amount: '',
+      bills_preferred_count: '',
+      bills_preferred_amount: '',
+      oldest_bill_date: '',
+      bills_cleared_count: '',
+      bills_cleared_amount: '',
+      latest_bill_date: '',
+      pending_bills_count: '',
+      pending_bills_amount: '',
+      remark: ''
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteCentralScheme = async (row) => {
+    if (!row?.id) return;
+    const ok = window.confirm('Are you sure you want to delete this scheme?');
+    if (!ok) return;
+    try {
+      await deleteScheme(row.id);
+      await fetchCentralSchemes();
+    } catch (err) {
+      console.error('Error deleting scheme:', err);
+      alert('Failed to delete scheme. Please try again.');
+    }
+  };
+
+  const handleDeleteStateScheme = async (row) => {
+    if (!row?.id) return;
+    const ok = window.confirm('Are you sure you want to delete this state scheme?');
+    if (!ok) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/schemes/state-schemes/${row.id}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to delete state scheme');
+      }
+      await fetchStateSchemeData();
+    } catch (err) {
+      console.error('Error deleting state scheme:', err);
+      alert('Failed to delete state scheme. Please try again.');
+    }
+  };
+
+  const handleDeleteRevenueEntry = async (row) => {
+    if (!row?.id) return;
+    const ok = window.confirm('Are you sure you want to delete this revenue entry?');
+    if (!ok) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/schemes/revenue/${row.id}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to delete revenue entry');
+      }
+      await fetchRevenueData();
+    } catch (err) {
+      console.error('Error deleting revenue entry:', err);
+      alert('Failed to delete revenue entry. Please try again.');
+    }
   };
 
   const handleChange = (e) => {
@@ -338,34 +492,39 @@ const fetchCentralSchemes = async (year = financialYear) => {
           remark: formData.remark || null
         };
 
-        await createScheme(submitData);
-        setFinancialRows(prev => [
-          {
-            id: Date.now(),
-            scheme_name: formData.name,
-            central_scheme_name: centralName,
-            hod: formData.hod,
-            allocation_goi_share: submitData.allocation_goi_share,
-            allocation_state_share: submitData.allocation_state_share,
-            allocation_total: submitData.allocation_total,
-            slsc_goi_share: submitData.slsc_goi_share,
-            slsc_state_share: submitData.slsc_state_share,
-            slsc_total: submitData.slsc_total,
-            sanction_goi_share: submitData.sanction_goi_share,
-            sanction_state_share: submitData.sanction_state_share,
-            sanction_total: submitData.sanction_total,
-            bro_released_amount: submitData.bro_released_amount,
-            dt_authorized_amount: submitData.dt_authorized_amount,
-            bills_preferred_count: submitData.bills_preferred_count,
-            bills_preferred_amount: submitData.bills_preferred_amount,
-            oldest_bill_date: submitData.oldest_bill_date,
-            bills_cleared_count: submitData.bills_cleared_count,
-            bills_cleared_amount: submitData.bills_cleared_amount,
-            latest_bill_date: submitData.latest_bill_date,
-            remark: submitData.remark
-          },
-          ...prev
-        ]);
+        if (editingItem?.type === 'central-sponsored-scheme' && editingItem?.id) {
+          await updateScheme(editingItem.id, submitData);
+        } else {
+          await createScheme(submitData);
+          setFinancialRows(prev => [
+            {
+              id: Date.now(),
+              scheme_name: formData.name,
+              central_scheme_name: centralName,
+              hod: formData.hod,
+              allocation_goi_share: submitData.allocation_goi_share,
+              allocation_state_share: submitData.allocation_state_share,
+              allocation_total: submitData.allocation_total,
+              slsc_goi_share: submitData.slsc_goi_share,
+              slsc_state_share: submitData.slsc_state_share,
+              slsc_total: submitData.slsc_total,
+              sanction_goi_share: submitData.sanction_goi_share,
+              sanction_state_share: submitData.sanction_state_share,
+              sanction_total: submitData.sanction_total,
+              bro_released_amount: submitData.bro_released_amount,
+              dt_authorized_amount: submitData.dt_authorized_amount,
+              bills_preferred_count: submitData.bills_preferred_count,
+              bills_preferred_amount: submitData.bills_preferred_amount,
+              oldest_bill_date: submitData.oldest_bill_date,
+              bills_cleared_count: submitData.bills_cleared_count,
+              bills_cleared_amount: submitData.bills_cleared_amount,
+              latest_bill_date: submitData.latest_bill_date,
+              remark: submitData.remark
+            },
+            ...prev
+          ]);
+        }
+
         await fetchCentralSchemes();
 
       }
@@ -389,8 +548,13 @@ const fetchCentralSchemes = async (year = financialYear) => {
           status: 'active'
         };
 
-        const response = await fetch('http://localhost:5000/api/schemes/state-schemes', {
-          method: 'POST',
+        const isEditing = editingItem?.type === 'state-scheme' && editingItem?.id;
+        const url = isEditing
+          ? `http://localhost:5000/api/schemes/state-schemes/${editingItem.id}`
+          : 'http://localhost:5000/api/schemes/state-schemes';
+
+        const response = await fetch(url, {
+          method: isEditing ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(submitData)
         });
@@ -401,7 +565,7 @@ const fetchCentralSchemes = async (year = financialYear) => {
         }
         
         const responseData = await response.json();
-        console.log('State scheme created:', responseData);
+        console.log(isEditing ? 'State scheme updated:' : 'State scheme created:', responseData);
         
         // Refresh state scheme data from database
         await fetchStateSchemeData();
@@ -417,8 +581,13 @@ const fetchCentralSchemes = async (year = financialYear) => {
           status: 'active'
         };
 
-        const response = await fetch('http://localhost:5000/api/schemes/revenue', {
-          method: 'POST',
+        const isEditing = editingItem?.type === 'revenue' && editingItem?.id;
+        const url = isEditing
+          ? `http://localhost:5000/api/schemes/revenue/${editingItem.id}`
+          : 'http://localhost:5000/api/schemes/revenue';
+
+        const response = await fetch(url, {
+          method: isEditing ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(submitData)
         });
@@ -429,7 +598,7 @@ const fetchCentralSchemes = async (year = financialYear) => {
         }
         
         const responseData = await response.json();
-        console.log('Revenue entry created:', responseData);
+        console.log(isEditing ? 'Revenue entry updated:' : 'Revenue entry created:', responseData);
         
         // Refresh revenue data from database
         await fetchRevenueData();
@@ -1679,6 +1848,7 @@ await fetchRevenueData();
                   <th colSpan="3" style={{ border: '1px solid #d0d7de', padding: '8px', background: '#f6f8fa' }}>Bills Preferred</th>
                   <th colSpan="3" style={{ border: '1px solid #d0d7de', padding: '8px', background: '#f6f8fa' }}>Bills Cleared</th>
                   <th rowSpan="2" style={{ border: '1px solid #d0d7de', padding: '8px', background: '#f6f8fa' }}>Remark</th>
+                  <th rowSpan="2" style={{ border: '1px solid #d0d7de', padding: '8px', background: '#f6f8fa' }}>Action</th>
                 </tr>
                 <tr>
                   <th style={{ border: '1px solid #d0d7de', padding: '8px', background: '#f6f8fa' }}>GOI share</th>
@@ -1700,7 +1870,7 @@ await fetchRevenueData();
               </thead>
               <tbody>
                 {financialRows.length === 0 ? (
-                  <tr><td colSpan="22" style={{ textAlign: 'center', padding: '16px', border: '1px solid #d0d7de' }}>No data</td></tr>
+                  <tr><td colSpan="23" style={{ textAlign: 'center', padding: '16px', border: '1px solid #d0d7de' }}>No data</td></tr>
                 ) : (
                   financialRows.map((row, idx) => {
                     const allocationGoi = row.allocation_goi_share ?? row.allocation_goi ?? row.allocation_total;
@@ -1745,6 +1915,16 @@ await fetchRevenueData();
                         <td style={{ border: '1px solid #d0d7de', padding: '8px' }}>{formatNumber(billsClearedAmount)}</td>
                         <td style={{ border: '1px solid #d0d7de', padding: '8px' }}>{formatDate(latestBillDate)}</td>
                         <td style={{ border: '1px solid #d0d7de', padding: '8px' }}>{row.remark || '-'}</td>
+                        <td style={{ border: '1px solid #d0d7de', padding: '8px' }}>
+                          <div className="action-buttons">
+                            <button className="action-btn edit" type="button" title="Edit" onClick={() => handleEditScheme(row)}>
+                              <FiEdit2 />
+                            </button>
+                            <button className="action-btn delete" type="button" title="Delete" onClick={() => handleDeleteCentralScheme(row)}>
+                              <FiTrash2 />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })
@@ -1765,6 +1945,7 @@ await fetchRevenueData();
                   <th colSpan="3" style={{ border: '1px solid #d0d7de', padding: '8px', background: '#f6f8fa' }}>Bills Preferred</th>
                   <th colSpan="3" style={{ border: '1px solid #d0d7de', padding: '8px', background: '#f6f8fa' }}>Bills Cleared</th>
                   <th colSpan="2" style={{ border: '1px solid #d0d7de', padding: '8px', background: '#f6f8fa' }}>Pending</th>
+                  <th rowSpan="2" style={{ border: '1px solid #d0d7de', padding: '8px', background: '#f6f8fa' }}>Action</th>
                 </tr>
                 <tr>
                   <th style={{ border: '1px solid #d0d7de', padding: '8px', background: '#f6f8fa' }}>No. of Bills</th>
@@ -1779,7 +1960,7 @@ await fetchRevenueData();
               </thead>
               <tbody>
                 {stateSchemeData.length === 0 ? (
-                  <tr><td colSpan="13" style={{ textAlign: 'center', padding: '16px', border: '1px solid #d0d7de' }}>No data</td></tr>
+                  <tr><td colSpan="14" style={{ textAlign: 'center', padding: '16px', border: '1px solid #d0d7de' }}>No data</td></tr>
                 ) : (
                   stateSchemeData.map((row, idx) => (
                     <tr key={row.id || idx}>
@@ -1796,6 +1977,16 @@ await fetchRevenueData();
                       <td style={{ border: '1px solid #d0d7de', padding: '8px' }}>{formatDate(row.billsClearedLatestDate)}</td>
                       <td style={{ border: '1px solid #d0d7de', padding: '8px' }}>{row.pendingNo || '-'}</td>
                       <td style={{ border: '1px solid #d0d7de', padding: '8px' }}>{formatNumber(row.pendingAmount)}</td>
+                      <td style={{ border: '1px solid #d0d7de', padding: '8px' }}>
+                        <div className="action-buttons">
+                          <button className="action-btn edit" type="button" title="Edit" onClick={() => handleEditStateScheme(row)}>
+                            <FiEdit2 />
+                          </button>
+                          <button className="action-btn delete" type="button" title="Delete" onClick={() => handleDeleteStateScheme(row)}>
+                            <FiTrash2 />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -1811,18 +2002,29 @@ await fetchRevenueData();
                   <th style={{ border: '1px solid #d0d7de', padding: '8px', background: '#f6f8fa' }}>Name of the Cooperation & Cooperatives</th>
                   <th style={{ border: '1px solid #d0d7de', padding: '8px', background: '#f6f8fa' }}>Loans</th>
                   <th style={{ border: '1px solid #d0d7de', padding: '8px', background: '#f6f8fa' }}>Revenue</th>
+                  <th style={{ border: '1px solid #d0d7de', padding: '8px', background: '#f6f8fa' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {revenueData.length === 0 ? (
-                  <tr><td colSpan="4" style={{ textAlign: 'center', padding: '16px', border: '1px solid #d0d7de' }}>No data</td></tr>
+                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '16px', border: '1px solid #d0d7de' }}>No data</td></tr>
                 ) : (
                   revenueData.map((row, idx) => (
                     <tr key={row.id || idx}>
-                      <td style={{ border: '1px solid #d0d7de', padding: '8px' }}>{row.slNo}</td>
+                      <td style={{ border: '1px solid #d0d7de', padding: '8px' }}>{row.sno || idx + 1}</td>
                       <td style={{ border: '1px solid #d0d7de', padding: '8px' }}>{row.cooperativeName}</td>
                       <td style={{ border: '1px solid #d0d7de', padding: '8px' }}>{row.loans || '-'}</td>
                       <td style={{ border: '1px solid #d0d7de', padding: '8px' }}>{row.revenue || '-'}</td>
+                      <td style={{ border: '1px solid #d0d7de', padding: '8px' }}>
+                        <div className="action-buttons">
+                          <button className="action-btn edit" type="button" title="Edit" onClick={() => handleEditRevenueEntry(row)}>
+                            <FiEdit2 />
+                          </button>
+                          <button className="action-btn delete" type="button" title="Delete" onClick={() => handleDeleteRevenueEntry(row)}>
+                            <FiTrash2 />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -1835,12 +2037,18 @@ await fetchRevenueData();
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        title={filterType === 'central-sponsored-scheme' ? 'Add New Central Scheme' : filterType === 'state-scheme' ? 'Add New State Scheme' : 'Add New Revenue Entry'}
+        title={
+          filterType === 'central-sponsored-scheme'
+            ? (editingItem?.type === 'central-sponsored-scheme' ? 'Edit Central Scheme' : 'Add New Central Scheme')
+            : filterType === 'state-scheme'
+              ? (editingItem?.type === 'state-scheme' ? 'Edit State Scheme' : 'Add New State Scheme')
+              : (editingItem?.type === 'revenue' ? 'Edit Revenue Entry' : 'Add New Revenue Entry')
+        }
         footer={
           <>
             <button className="btn btn-secondary" onClick={handleCloseModal}>Cancel</button>
             <button className="btn btn-primary" onClick={handleSubmit}>
-              Create
+              {editingItem ? 'Update' : 'Create'}
             </button>
           </>
         }

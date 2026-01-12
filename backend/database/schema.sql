@@ -103,6 +103,16 @@ CREATE TABLE IF NOT EXISTS budget (
     utilized_amount DECIMAL(15, 2) DEFAULT 0,
     category VARCHAR(100),
     description TEXT,
+    dao_id INT,
+    section VARCHAR(255),
+    budget_estimation_state DECIMAL(15, 2) DEFAULT 0,
+    budget_estimation_central DECIMAL(15, 2) DEFAULT 0,
+    budget_sanction_state DECIMAL(15, 2) DEFAULT 0,
+    budget_sanction_central DECIMAL(15, 2) DEFAULT 0,
+    budget_remaining_state DECIMAL(15, 2) DEFAULT 0,
+    budget_remaining_central DECIMAL(15, 2) DEFAULT 0,
+    budget_pending_state DECIMAL(15, 2) DEFAULT 0,
+    budget_pending_central DECIMAL(15, 2) DEFAULT 0,
     state_id INT,
     district_id INT,
     mandal_id INT,
@@ -129,6 +139,18 @@ CREATE TABLE IF NOT EXISTS kpis (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (hod_id) REFERENCES hods(id) ON DELETE SET NULL
+);
+
+-- District Agriculture Officers (DAO) Table
+CREATE TABLE IF NOT EXISTS dao (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    department VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE,
+    phone VARCHAR(20),
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 -- Nodal Officers Table
@@ -364,6 +386,19 @@ INSERT INTO staff (name, employee_id, designation, department, category_id, hod_
 ('Anitha Rao', 'AGR010', 'Field Assistant - Fisheries', 'Fisheries', 3, 3, 'anitha.rao@agri.gov.in', '9876543229', '2022-06-15', 'active'),
 ('Ganesh Reddy', 'AGR011', 'Dairy Development Officer', 'Animal Husbandry', 4, 4, 'ganesh.reddy@agri.gov.in', '9876543230', '2020-09-01', 'active'),
 ('Sita Kumari', 'AGR012', 'Agriculture Extension Officer', 'Agricultural Marketing', 7, 7, 'sita.kumari@agri.gov.in', '9876543231', '2021-11-20', 'active');
+
+-- Sample DAO (District Agriculture Officers)
+INSERT INTO dao (name, department, email, phone, status) VALUES
+('Shri. Krishna Murthy', 'Hyderabad', 'km@agri.gov.in', '9876543240', 'active'),
+('Dr. Sampath Kumar', 'Rangareddy', 'sampath@agri.gov.in', '9876543241', 'active'),
+('Smt. Kavya Reddy', 'Medak', 'kavya@agri.gov.in', '9876543242', 'active'),
+('Shri. Rajesh Babu', 'Nalgonda', 'rajesh@agri.gov.in', '9876543243', 'active'),
+('Dr. Anjali Devi', 'Khammam', 'anjali@agri.gov.in', '9876543244', 'active'),
+('Shri. Ramakrishnan', 'Warangal', 'ramakrishnan@agri.gov.in', '9876543245', 'active'),
+('Smt. Deepa Sharma', 'Karimnagar', 'deepa@agri.gov.in', '9876543246', 'active'),
+('Shri. Mahesh Kumar', 'Adilabad', 'mahesh@agri.gov.in', '9876543247', 'active'),
+('Dr. Vasanthi', 'Nizamabad', 'vasanthi@agri.gov.in', '9876543248', 'active'),
+('Shri. Prakash Rao', 'Mancherial', 'prakash@agri.gov.in', '9876543249', 'active');
 
 -- Sample Budget entries
 INSERT INTO budget (hod_id, scheme_id, financial_year, allocated_amount, utilized_amount, category, description) VALUES

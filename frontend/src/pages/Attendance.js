@@ -21,10 +21,21 @@ import {
   updateAttendance, 
   deleteAttendance, 
   getStaff,
-  getHODs 
+  getHODs,
+  getDepartmentWiseAttendance
 } from '../services/api';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  ChartDataLabels
+);
+
 
 const Attendance = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -34,6 +45,7 @@ const Attendance = () => {
   const [statistics, setStatistics] = useState(null);
   const [staffList, setStaffList] = useState([]);
   const [hodList, setHodList] = useState([]);
+  const [departmentData, setDepartmentData] = useState([]);
   
   // UI states
   const [loading, setLoading] = useState(true);
@@ -45,13 +57,14 @@ const Attendance = () => {
   const [pageSize] = useState(10);
   
   // Status popup state
-  const [statusPopup, setStatusPopup] = useState({ open: false, status: '', title: '', data: [] });
+  const [statusPopup, setStatusPopup] = useState({ open: false, status: '', title: '', data: [], department: '' });
   
   // Filter states
   const [filters, setFilters] = useState({
     period: searchParams.get('period') || 'today',
     status: searchParams.get('status') || 'all',
     hod_id: searchParams.get('hod_id') || '',
+    department: searchParams.get('department') || '',
     employee_type: searchParams.get('employee_type') || 'all',
     start_date: searchParams.get('start_date') || '',
     end_date: searchParams.get('end_date') || ''
@@ -72,16 +85,6 @@ const Attendance = () => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isSuperAdmin = user.role === 'superadmin';
   const isReadOnly = !isSuperAdmin;
-
-  // Fetch initial data
-  useEffect(() => {
-    fetchInitialData();
-  }, []);
-
-  // Fetch attendance when filters change
-  useEffect(() => {
-    fetchAttendanceData();
-  }, [filters]);
 
   const fetchInitialData = async () => {
     try {
@@ -106,13 +109,15 @@ const Attendance = () => {
         if (!params[key] || params[key] === 'all') delete params[key];
       });
 
-      const [attendanceRes, statsRes] = await Promise.all([
+      const [attendanceRes, statsRes, deptRes] = await Promise.all([
         getAttendanceFiltered(params),
-        getAttendanceStatistics(params)
+        getAttendanceStatistics(params),
+        getDepartmentWiseAttendance(params)
       ]);
 
       setAttendance(attendanceRes.data || []);
       setStatistics(statsRes.data || null);
+      setDepartmentData(deptRes.data || []);
       setError(null);
     } catch (err) {
       console.error('Error fetching attendance data:', err);
@@ -121,6 +126,16 @@ const Attendance = () => {
       setLoading(false);
     }
   }, [filters]);
+
+  // Fetch initial data
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
+
+  // Fetch attendance when filters change
+  useEffect(() => {
+    fetchAttendanceData();
+  }, [fetchAttendanceData]);
 
   // Calculate statistics from current data
   const stats = useMemo(() => {
@@ -143,7 +158,9 @@ const Attendance = () => {
   const barChartData = useMemo(() => {
     if (!statistics) return null;
     
-    const data = chartView === 'monthly' ? statistics.monthlyTrend : statistics.dailyTrend;
+    const data = chartView === 'monthly'
+  ? statistics?.monthlyTrend || []
+  : statistics?.dailyTrend || [];
     if (!data || data.length === 0) return null;
 
     // Status to field mapping
@@ -162,7 +179,7 @@ const Attendance = () => {
         labels: data.map(item => chartView === 'monthly' ? item.month_label : item.day_label),
         datasets: [{
           label: config.label,
-          data: data.map(item => item[config.field]),
+         data: data.map(item => Number(item[config.field] || 0)),
           backgroundColor: config.color,
           borderRadius: 4,
         }]
@@ -175,13 +192,13 @@ const Attendance = () => {
       datasets: [
         {
           label: 'Present',
-          data: data.map(item => item.present),
+          data: data.map(item => Number(item.present || 0)),
           backgroundColor: '#4CAF50',
           borderRadius: 4,
         },
         {
           label: 'Absent',
-          data: data.map(item => item.absent),
+          data: data.map(item => Number(item.absent || 0)),
           backgroundColor: '#F44336',
           borderRadius: 4,
         },
@@ -222,6 +239,17 @@ const Attendance = () => {
       }]
     };
   }, [stats]);
+
+  // Get unique departments from HOD list
+  const uniqueDepartments = useMemo(() => {
+    const departments = new Set();
+    hodList.forEach(hod => {
+      if (hod.department) {
+        departments.add(hod.department);
+      }
+    });
+    return Array.from(departments).sort();
+  }, [hodList]);
 
   // Chart options
   const barChartOptions = {
@@ -314,21 +342,44 @@ const Attendance = () => {
   };
 
   // Handle status card click to open popup
+  const isLate = (r) => r.check_in && r.check_in > '10:30:00';
+
   const handleStatusPopupOpen = (status, title) => {
     const statusMap = {
-      'present': record => (record.display_status || record.status) === 'present' && (!record.check_in || record.check_in <= '10:45:00'),
-      'absent': record => (record.display_status || record.status) === 'absent',
-      'late': record => (record.display_status || record.status) === 'late' || ((record.display_status || record.status) === 'present' && record.check_in && record.check_in > '10:45:00'),
-      'half_day': record => (record.display_status || record.status) === 'half_day',
-      'leave': record => ['leave', 'on_leave'].includes(record.display_status || record.status)
-    };
+  present: r =>
+    (r.display_status || r.status) === 'present' && !isLate(r),
+
+  absent: r =>
+    (r.display_status || r.status) === 'absent',
+
+  late: r =>
+    isLate(r),
+
+  half_day: r =>
+    (r.display_status || r.status) === 'half_day',
+
+  leave: r =>
+    ['leave', 'on_leave'].includes(r.display_status || r.status)
+};
+
     
     const filteredData = attendance.filter(statusMap[status] || (() => false));
-    setStatusPopup({ open: true, status, title, data: filteredData });
+    setStatusPopup({ open: true, status, title, data: filteredData, department: '' });
+  };
+
+  // Handle department status card click to open popup with department employees
+  const handleDepartmentStatusPopup = (department, departmentName, status, title, employees) => {
+    setStatusPopup({ 
+      open: true, 
+      status, 
+      title: `${departmentName} - ${title}`, 
+      data: employees,
+      department: departmentName
+    });
   };
 
   const handleStatusPopupClose = () => {
-    setStatusPopup({ open: false, status: '', title: '', data: [] });
+    setStatusPopup({ open: false, status: '', title: '', data: [], department: '' });
   };
 
   const handleExportPopupData = () => {
@@ -344,7 +395,7 @@ const Attendance = () => {
           record.date || '',
           record.check_in || '',
           record.check_out || '',
-          (record.display_status || record.status || '').replace('_', ' '),
+          ((record.display_status || record.status) || '').replace('_', ' '),
           record.remarks || ''
         ].map(val => `"${val}"`).join(','))
       ].join('\n');
@@ -352,7 +403,7 @@ const Attendance = () => {
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `Attendance_${statusPopup.title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `Attendance_${(statusPopup.title || 'Report').replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
     } catch (err) {
       console.error('Export error:', err);
@@ -368,13 +419,15 @@ const Attendance = () => {
         if (!params[key] || params[key] === 'all') delete params[key];
       });
 
-      const [attendanceRes, statsRes] = await Promise.all([
+      const [attendanceRes, statsRes, deptRes] = await Promise.all([
         getAttendanceFiltered(params),
-        getAttendanceStatistics(params)
+        getAttendanceStatistics(params),
+        getDepartmentWiseAttendance(params)
       ]);
 
       setAttendance(attendanceRes.data || []);
       setStatistics(statsRes.data || null);
+      setDepartmentData(deptRes.data || []);
       setError(null);
     } catch (err) {
       console.error('Error refreshing data:', err);
@@ -399,7 +452,7 @@ const Attendance = () => {
           record.check_in || '',
           record.check_out || '',
           record.working_hours || '',
-          (record.display_status || record.status || '').replace('_', ' '),
+          ((record.display_status || record.status) || '').replace('_', ' '),
           record.remarks || ''
         ].map(val => `"${val}"`).join(','))
       ].join('\n');
@@ -675,16 +728,16 @@ const Attendance = () => {
             textShadow: '0 1px 2px rgba(0,0,0,0.2)'
           }}>
             <FiUsers style={{ marginRight: '5px' }} size={12} />
-            Department/HOD
+            Department
           </label>
           <select 
-            value={filters.hod_id} 
-            onChange={(e) => handleFilterChange('hod_id', e.target.value)}
+            value={filters.department} 
+            onChange={(e) => handleFilterChange('department', e.target.value)}
             style={{ 
               padding: '9px 12px', 
               borderRadius: '8px', 
               border: 'none', 
-              minWidth: '200px', 
+              minWidth: '150px', 
               fontSize: '13px',
               fontWeight: '600',
               background: '#fff',
@@ -696,8 +749,10 @@ const Attendance = () => {
             }}
           >
             <option value="">🏢 All Departments</option>
-            {hodList.map(hod => (
-              <option key={hod.id} value={hod.id}>{hod.department}</option>
+            {uniqueDepartments.map(dept => (
+              <option key={dept} value={dept}>
+                {dept}
+              </option>
             ))}
           </select>
         </div>
@@ -737,7 +792,7 @@ const Attendance = () => {
           >
             <option value="all">👥 All Types</option>
             <option value="regular">💼 Regular</option>
-            <option value="outsource">🔄 Outsource</option>
+            <option value="outsource">🔄 OD</option>
           </select>
         </div>
 
@@ -794,7 +849,7 @@ const Attendance = () => {
       {/* Summary Cards - Compact Design */}
       <div style={{ 
         display: 'grid', 
-        gridTemplateColumns: 'repeat(6, 1fr)', 
+        gridTemplateColumns: 'repeat(5, 1fr)', 
         gap: '12px', 
         marginBottom: '15px' 
       }}>
@@ -907,42 +962,6 @@ const Attendance = () => {
         </div>
 
         <div 
-          onClick={() => handleStatusPopupOpen('half_day', 'Half Day')} 
-          style={{ 
-            cursor: 'pointer', 
-            padding: '12px',
-            background: '#fff',
-            borderRadius: '8px',
-            border: '1px solid #eee',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            transition: 'all 0.2s'
-          }}
-        >
-          <div style={{ 
-            width: '36px', 
-            height: '36px', 
-            borderRadius: '8px', 
-            background: 'rgba(156, 39, 176, 0.1)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            color: '#9C27B0'
-          }}>
-            <FiCalendar size={18} />
-          </div>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: '#333' }}>{stats.halfDay}</h3>
-            <p style={{ margin: 0, fontSize: '11px', color: '#666' }}>Half Day</p>
-            <span style={{ fontSize: '10px', color: '#999' }}>
-              {stats.total > 0 ? ((stats.halfDay / stats.total) * 100).toFixed(1) : 0}%
-            </span>
-          </div>
-        </div>
-
-        <div 
           onClick={() => handleStatusPopupOpen('leave', 'On Leave')} 
           style={{ 
             cursor: 'pointer', 
@@ -1009,6 +1028,241 @@ const Attendance = () => {
           </div>
         </div>
       </div>
+
+      {/* Department-Wise Attendance Cards */}
+      {departmentData && departmentData.length > 0 && (
+        <div style={{ marginBottom: '20px' }}>
+          {departmentData.map((dept, deptIndex) => (
+            <div key={deptIndex} style={{ marginBottom: '16px' }}>
+              <div style={{ 
+                // background: 'linear-gradient(135deg, #00bcd4 0%, #22c1c3 100%)',
+                padding: '12px 20px',
+                color: '#1e1b1b',
+                fontWeight: '700',
+                fontSize: '14px',
+                marginBottom: '10px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                {dept.department}
+              </div>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(5, 1fr)', 
+                gap: '10px'
+              }}>
+                {/* Total Emp */}
+                <div 
+                  onClick={() => handleDepartmentStatusPopup(dept.department, dept.department, 'total', 'Total Emp', dept.employees.total)}
+                  style={{ 
+                    cursor: 'pointer',
+                    background: 'linear-gradient(135deg, #3f87ff 0%, #22c1c3 100%)',
+                    padding: '12px',
+                    color: '#fff',
+                    position: 'relative',
+                    minHeight: '90px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)'; }}
+                >
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: '600', marginBottom: '4px', opacity: 0.92 }}>Total Emp</div>
+                    <div style={{ fontSize: '24px', fontWeight: '800', lineHeight: '1' }}>{dept.total_emp || 0}</div>
+                    <div style={{ fontSize: '10px', marginTop: '3px', opacity: 0.85 }}>100.0%</div>
+                  </div>
+                  <div style={{ 
+                    position: 'absolute', 
+                    right: '10px', 
+                    bottom: '10px',
+                    width: '32px',
+                    height: '32px',
+                    background: 'rgba(255, 255, 255, 0.22)',
+                    border: '1px solid rgba(255, 255, 255, 0.42)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <FiUsers size={16} />
+                  </div>
+                </div>
+
+                {/* Present */}
+                <div 
+                  onClick={() => handleDepartmentStatusPopup(dept.department, dept.department, 'present', 'Present', dept.employees?.present || [])}
+                  style={{ 
+                    cursor: 'pointer',
+                    background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+                    padding: '12px',
+                    color: '#fff',
+                    position: 'relative',
+                    minHeight: '90px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)'; }}
+                >
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: '600', marginBottom: '4px', opacity: 0.92 }}>Present</div>
+                    <div style={{ fontSize: '24px', fontWeight: '800', lineHeight: '1' }}>{dept.present || 0}</div>
+                    <div style={{ fontSize: '10px', marginTop: '3px', opacity: 0.85 }}>
+                      {dept.total_emp > 0 ? ((dept.present / dept.total_emp) * 100).toFixed(1) : 0}%
+                    </div>
+                  </div>
+                  <div style={{ 
+                    position: 'absolute', 
+                    right: '10px', 
+                    bottom: '10px',
+                    width: '32px',
+                    height: '32px',
+                    background: 'rgba(255, 255, 255, 0.22)',
+                    border: '1px solid rgba(255, 255, 255, 0.42)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <FiCheckCircle size={16} />
+                  </div>
+                </div>
+
+                {/* Absent */}
+                <div 
+                  onClick={() => handleDepartmentStatusPopup(dept.department, dept.department, 'absent', 'Absent', dept.employees.absent)}
+                  style={{ 
+                    cursor: 'pointer',
+                    background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)',
+                    padding: '12px',
+                    color: '#fff',
+                    position: 'relative',
+                    minHeight: '90px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)'; }}
+                >
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: '600', marginBottom: '4px', opacity: 0.92 }}>Absent</div>
+                    <div style={{ fontSize: '24px', fontWeight: '800', lineHeight: '1' }}>{dept.absent || 0}</div>
+                    <div style={{ fontSize: '10px', marginTop: '3px', opacity: 0.85 }}>
+                      {dept.total_emp > 0 ? ((dept.absent / dept.total_emp) * 100).toFixed(1) : 0}%
+                    </div>
+                  </div>
+                  <div style={{ 
+                    position: 'absolute', 
+                    right: '10px', 
+                    bottom: '10px',
+                    width: '32px',
+                    height: '32px',
+                    background: 'rgba(255, 255, 255, 0.22)',
+                    border: '1px solid rgba(255, 255, 255, 0.42)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <FiXCircle size={16} />
+                  </div>
+                </div>
+
+                {/* Late */}
+                <div 
+                  onClick={() => handleDepartmentStatusPopup(dept.department, dept.department, 'late', 'Late (after 10:30)', dept.employees.late)}
+                  style={{ 
+                    cursor: 'pointer',
+                    background: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)',
+                    padding: '12px',
+                    color: '#fff',
+                    position: 'relative',
+                    minHeight: '90px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)'; }}
+                >
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: '600', marginBottom: '4px', opacity: 0.92 }}>Late (after 10:30)</div>
+                    <div style={{ fontSize: '24px', fontWeight: '800', lineHeight: '1' }}>{dept.late || 0}</div>
+                    <div style={{ fontSize: '10px', marginTop: '3px', opacity: 0.85 }}>
+                      {dept.total_emp > 0 ? ((dept.late / dept.total_emp) * 100).toFixed(1) : 0}%
+                    </div>
+                  </div>
+                  <div style={{ 
+                    position: 'absolute', 
+                    right: '10px', 
+                    bottom: '10px',
+                    width: '32px',
+                    height: '32px',
+                    background: 'rgba(255, 255, 255, 0.22)',
+                    border: '1px solid rgba(255, 255, 255, 0.42)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <FiClock size={16} />
+                  </div>
+                </div>
+
+                {/* Emp Leave */}
+                <div 
+                  onClick={() => handleDepartmentStatusPopup(dept.department, dept.department, 'leave', 'Emp Leave', dept.employees.leave)}
+                  style={{ 
+                    cursor: 'pointer',
+                    background: 'linear-gradient(135deg, #00b09b 0%, #96c93d 100%)',
+                    padding: '12px',
+                    color: '#fff',
+                    position: 'relative',
+                    minHeight: '90px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)'; }}
+                >
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: '600', marginBottom: '4px', opacity: 0.92 }}>Emp Leave</div>
+                    <div style={{ fontSize: '24px', fontWeight: '800', lineHeight: '1' }}>{dept.emp_leave || 0}</div>
+                    <div style={{ fontSize: '10px', marginTop: '3px', opacity: 0.85 }}>
+                      {dept.total_emp > 0 ? ((dept.emp_leave / dept.total_emp) * 100).toFixed(1) : 0}%
+                    </div>
+                  </div>
+                  <div style={{ 
+                    position: 'absolute', 
+                    right: '10px', 
+                    bottom: '10px',
+                    width: '32px',
+                    height: '32px',
+                    background: 'rgba(255, 255, 255, 0.22)',
+                    border: '1px solid rgba(255, 255, 255, 0.42)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <FiCalendar size={16} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Charts Section */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', marginBottom: '20px' }}>
@@ -1122,7 +1376,7 @@ const Attendance = () => {
         <div className="table-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
             <div>Total records: <strong>{attendance.length}</strong> | Showing {Math.min(currentPage * pageSize + 1, attendance.length)}-{Math.min((currentPage + 1) * pageSize, attendance.length)} of {attendance.length}</div>
-            {filters.status !== 'all' && (
+            {filters.status && filters.status !== 'all' && (
               <span style={{ 
                 padding: '4px 12px', 
                 borderRadius: '20px', 
@@ -1193,7 +1447,7 @@ const Attendance = () => {
                     <td>{record.working_hours || '-'}</td>
                     <td>
                       <span className={`status-badge ${getStatusColor(record.display_status)}`}>
-                        {(record.display_status || record.status || 'N/A').replace('_', ' ')}
+                        {((record.display_status || record.status) || 'N/A').replace('_', ' ')}
                       </span>
                     </td>
                     <td style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

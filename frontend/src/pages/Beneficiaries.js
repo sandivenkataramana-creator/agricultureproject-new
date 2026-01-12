@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FiFilter } from 'react-icons/fi';
+import { FiFilter, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import { FiCalendar, FiUsers, FiDownload, FiRefreshCw, FiMapPin, FiBriefcase, FiMap } from 'react-icons/fi';
 import { getDistricts, getMandalsByDistrict, getVillagesByMandal, getVillagesByDistrict, searchBeneficiaries, exportBeneficiaries, importBeneficiaries, getImportJobStatus, getBeneficiariesSummary, getHODs, getHODDetails, getSchemes, getSchemesByHODId, getSchemeById, getLocationCounts } from '../services/api';
 import Drawer from '../components/Drawer';
@@ -653,6 +653,7 @@ const Beneficiaries = () => {
               <th>DOB</th>
               <th>Amount</th>
               <th>Created</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -672,11 +673,41 @@ const Beneficiaries = () => {
                   <td>{r.dob ? new Date(r.dob).toLocaleDateString() : '-'}</td>
                   <td>{r.amount != null ? `₹${Number(r.amount).toLocaleString()}` : '-'}</td>
                   <td>{new Date(r.created_at).toLocaleString()}</td>
+                  <td>
+                    <div className="action-buttons">
+                      <button
+                        className="action-btn edit"
+                        type="button"
+                        title="Edit"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedBeneficiary(r);
+                          setIsDetailModalOpen(false);
+                          alert('Beneficiary edit is not available yet.');
+                        }}
+                      >
+                        <FiEdit2 />
+                      </button>
+                      <button
+                        className="action-btn delete"
+                        type="button"
+                        title="Delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedBeneficiary(r);
+                          setIsDetailModalOpen(false);
+                          alert('Beneficiary delete is not available yet.');
+                        }}
+                      >
+                        <FiTrash2 />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={13} style={{ textAlign: 'center', padding: 20, color: '#666' }}>No data. Use filters and click <strong>Search</strong> to load beneficiaries.</td>
+                <td colSpan={14} style={{ textAlign: 'center', padding: 20, color: '#666' }}>No data. Use filters and click <strong>Search</strong> to load beneficiaries.</td>
               </tr>
             )}
           </tbody>

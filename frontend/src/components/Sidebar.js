@@ -38,7 +38,7 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
         { path: '/hods', icon: <FiUsers />, label: 'HODs' },
         { path: '/dao', icon: <FiUsers />, label: 'DAO' },
         { path: '/schemes', icon: <FiFileText />, label: 'Schemes' },
-        { path: '/programs', icon: <FiFileText />, label: 'Programs' },
+        { path: '/flagship-programmes', icon: <FiFileText />, label: 'Flagship Programs & Reports' },
         { path: '/staff', icon: <FiUserCheck />, label: 'Staff' },
         { path: '/budget', icon: <FiDollarSign />, label: 'Budget' },
         { path: '/attendance', icon: <FiCalendar />, label: 'Attendance' },
