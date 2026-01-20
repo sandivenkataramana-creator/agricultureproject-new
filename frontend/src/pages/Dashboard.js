@@ -18,7 +18,7 @@ import {
   Filler,
 } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
-import { FiUsers, FiFileText, FiTrendingUp, FiActivity, FiPieChart, FiBarChart2, FiFilter, FiClock, FiMapPin, FiUserCheck } from 'react-icons/fi';
+import { FiUsers, FiFileText, FiTrendingUp, FiActivity, FiPieChart, FiBarChart2, FiFilter, FiClock, FiMapPin, FiUserCheck, FiRefreshCw, FiCheckCircle, FiUserX, FiAlertCircle } from 'react-icons/fi';
 import { BiRupee, BiWallet } from 'react-icons/bi';
 import { HiOutlineUserGroup } from 'react-icons/hi';
 import {
@@ -609,14 +609,14 @@ const Dashboard = () => {
           }, { present: 0, absent: 0, half_day: 0, on_leave: 0 });
           const total = summary.present + summary.absent + summary.half_day + summary.on_leave;
           const percentage = total > 0 ? ((summary.present / total) * 100).toFixed(1) : 0;
-          return [[
-            allHODs.find(h => h.id === parseInt(selectedHOD))?.name || 'Selected HOD',
+          return [
+            'Summary',
             summary.present,
             summary.absent,
             summary.half_day,
             summary.on_leave,
             `${percentage}%`
-          ]];
+          ];
         })()
       : attendanceByHOD.map(a => {
           const total = a.present + a.absent + a.half_day + (a.on_leave || 0);
@@ -1811,455 +1811,786 @@ if (!isNaN(safeTotal)) {
   }
 
   return (
-    <div className="page-container">
-      {/* <Header 
-        title="Dashboard" 
-        subtitle="Welcome to HOD Management System" 
-        onRefresh={handleRefresh}
-        onExport={handleExport}
-      /> */}
+    <div className="page-container" style={{ padding: '16px', backgroundColor: '#f0f3f7', minHeight: '100vh' }}>
 
-      {/* Filter Bar - Commented out
-      <div className="filter-bar">
-        <div className="filter-item">
-          <label>HOD</label>
-          <select 
-            value={selectedHOD} 
-            onChange={(e) => {
-              setSelectedHOD(e.target.value);
-              setFilters({ ...filters, hod_id: e.target.value });
+      {/* Section 0: HODs & Flagship Programmes */}
+      <div style={{ marginBottom: '14px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
+          {/* Total HODs Card */}
+          <div 
+            onClick={() => navigate('/hods')}
+            style={{
+              background: 'linear-gradient(135deg, #3f87ff 0%, #22c1c3 100%)',
+              borderRadius: '10px',
+              padding: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 3px 10px rgba(63, 135, 255, 0.2)',
+              position: 'relative',
+              overflow: 'hidden',
+              minHeight: '95px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 5px 14px rgba(63, 135, 255, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 3px 10px rgba(63, 135, 255, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
-            <option value="">All HODs</option>
-            {allHODs.map(hod => (
-              <option key={hod.id} value={hod.id}>{hod.name} - {hod.department}</option>
-            ))}
-          </select>
-        </div>
-        <div className="filter-item">
-          <label>Year</label>
-          <select value={filters.year} onChange={(e) => { const nf = {...filters, year: e.target.value}; setFilters(nf); fetchDashboardData(nf); }}>
-            <option>All</option>
-            <option>2023</option>
-            <option>2024</option>
-            <option>2025</option>
-          </select>
-        </div>
-        <div className="filter-item">
-          <label>Month</label>
-          <select value={filters.month} onChange={(e) => { const nf = {...filters, month: e.target.value}; setFilters(nf); }}>
-            <option>All</option>
-            <option value="1">Jan</option>
-            <option value="2">Feb</option>
-            <option value="3">Mar</option>
-            <option value="4">Apr</option>
-            <option value="5">May</option>
-            <option value="6">Jun</option>
-            <option value="7">Jul</option>
-            <option value="8">Aug</option>
-            <option value="9">Sep</option>
-            <option value="10">Oct</option>
-            <option value="11">Nov</option>
-            <option value="12">Dec</option>
-          </select>
-        </div>
-        <div className="filter-item">
-          <label>Date</label>
-          <input type="date" value={filters.date} onChange={(e) => { const nf = {...filters, date: e.target.value}; setFilters(nf); }} />
-        </div>
-        <div className="filter-actions">
-          <button className="btn btn-secondary btn-sm" onClick={() => { 
-            setSelectedHOD('');
-            setSelectedHODTable({ schemes: '', budget: '', attendance: '' });
-            setFilters({ year: 'All', month: 'All', date: '', hod_id: '' }); 
-            fetchDashboardData({ year: 'All', month: 'All', date: '', hod_id: '' });
-            setSchemesDetails([]);
-            setBudgetDetails([]);
-            setAttendanceDetails([]);
-          }}>Clear</button>
-          <button className="btn btn-primary btn-sm" onClick={() => fetchDashboardData()}>Apply</button>
-        </div>
-      </div>
-      */}
-
-      {/* Hero Stats (top big cards like reference) */}
-      {/* <div className="hero-stats">
-        <div className="hero-card">
-          <div className="hero-number purple">{formatCompactNumber(stats.totalHods)}</div>
-          <div className="hero-label">HODs</div>
-        </div>
-        <div className="hero-card">
-          <div className="hero-number green">{formatCompactNumber(quickStats.districtsCovered)}</div>
-          <div className="hero-label">District</div>
-        </div>
-        <div className="hero-card">
-          <div className="hero-number red">{formatCompactNumber(quickStats.beneficiaries)}</div>
-          <div className="hero-label">Total Farmers</div>
-        </div>
-        <div className="hero-card">
-          <div className="hero-number purple">{formatCurrency(stats.totalBudget)}</div>
-          <div className="hero-label">Total Budget</div>
-        </div>
-        <div className="hero-card">
-          <div className="hero-number blue">{formatCompactNumber(stats.totalSchemes)}</div>
-          <div className="hero-label">Nursery</div>
-        </div>
-        <div className="hero-card">
-          <div className="hero-number teal">{formatCompactNumber(quickStats.nodalOfficers)}</div>
-          <div className="hero-label">Nodal Officers</div>
-        </div>
-      </div> */}
-
-      {/* Stats Cards */}
-      <div className="dashboard-top-row">
-        <div className="dashboard-top-left">
-          <div className="dashboard-mini-tiles">
-            <div className="dashboard-mini-tile" style={{ '--from': '#3f87ff', '--to': '#22c1c3' }} onClick={() => navigate('/hods')}>
-              <div className="dashboard-tile-content">
-                <div className="dashboard-tile-label">Total HODs</div>
-                <div className="dashboard-tile-value">{stats.totalHods || 0}</div>
-                <div className="dashboard-tile-sub">{stats.activeHods || 0} Active • {(stats.totalHods || 0) - (stats.activeHods || 0)} Inactive</div>
-              </div>
-              <div className="dashboard-tile-icon" aria-hidden="true"><FiUsers /></div>
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Total HODs</p>
+              <h3 style={{ margin: '0 0 3px 0', fontSize: '24px', fontWeight: '700', color: '#fff' }}>{stats.totalHods || 0}</h3>
+              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{stats.activeHods || 0} Active • {(stats.totalHods || 0) - (stats.activeHods || 0)} Inactive</p>
             </div>
-
-            <div className="dashboard-mini-tile" style={{ '--from': '#5f72bd', '--to': '#9b23ea' }} onClick={() => navigate('/flagship-programmes')}>
-              <div className="dashboard-tile-content">
-                <div className="dashboard-tile-label">Flagship Programmes</div>
-                <div className="dashboard-tile-value">{stats.totalPrograms || 0}</div>
-                <div className="dashboard-tile-sub">{stats.activePrograms || 0} Active • {stats.inactivePrograms || 0} Inactive</div>
-              </div>
-              <div className="dashboard-tile-icon" aria-hidden="true"><FiActivity /></div>
+            <div style={{ position: 'absolute', right: '12px', top: '12px', opacity: 0.14 }}>
+              <FiUsers size={26} color="#fff" />
             </div>
           </div>
-        </div>
 
-        {/* Schemes Summary (Central/State) - right of HOD */}
-        <div className="dashboard-top-right">
-          <div className="schemes-summary-section">
-            <div className="schemes-summary-title">Schemes</div>
-            <div className="schemes-summary-cards">
-              <div className="schemes-summary-card" style={{ '--from': '#43e97b', '--to': '#38f9d7' }} onClick={() => navigate(`/schemes?filterType=central-sponsored-scheme&year=${encodeURIComponent(schemesSummary.year)}`)}>
-                <div className="dashboard-tile-content">
-                  <div className="dashboard-tile-label">Total Schemes</div>
-                  <div className="dashboard-tile-value">{schemesSummary.total.total}</div>
-                  <div className="dashboard-tile-sub">{formatCSBreakdown(schemesSummary.total.central, schemesSummary.total.state)}</div>
-                </div>
-                <div className="dashboard-tile-icon" aria-hidden="true"><FiFileText /></div>
-              </div>
-
-              <div className="schemes-summary-card" style={{ '--from': '#f7971e', '--to': '#ffd200' }} onClick={() => navigate(`/schemes?filterType=central-sponsored-scheme&year=${encodeURIComponent(schemesSummary.year)}`)}>
-                <div className="dashboard-tile-content">
-                  <div className="dashboard-tile-label">Active Schemes</div>
-                  <div className="dashboard-tile-value">{schemesSummary.active.total}</div>
-                  <div className="dashboard-tile-sub">{formatCSBreakdown(schemesSummary.active.central, schemesSummary.active.state)}</div>
-                </div>
-                <div className="dashboard-tile-icon" aria-hidden="true"><FiActivity /></div>
-              </div>
-
-              <div className="schemes-summary-card" style={{ '--from': '#5f72bd', '--to': '#9b23ea' }} onClick={() => navigate(`/schemes?filterType=central-sponsored-scheme&year=${encodeURIComponent(schemesSummary.year)}`)}>
-                <div className="dashboard-tile-content">
-                  <div className="dashboard-tile-label">Inactive Scheme</div>
-                  <div className="dashboard-tile-value">{schemesSummary.inactive.total}</div>
-                  <div className="dashboard-tile-sub">{formatCSBreakdown(schemesSummary.inactive.central, schemesSummary.inactive.state)}</div>
-                </div>
-                <div className="dashboard-tile-icon" aria-hidden="true"><FiClock /></div>
-              </div>
+          {/* Flagship Programmes Card */}
+          <div 
+            onClick={() => navigate('/flagship-programmes')}
+            style={{
+              background: 'linear-gradient(135deg, #5f72bd 0%, #9b23ea 100%)',
+              borderRadius: '10px',
+              padding: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 3px 10px rgba(155, 35, 234, 0.2)',
+              position: 'relative',
+              overflow: 'hidden',
+              minHeight: '95px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 5px 14px rgba(155, 35, 234, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 3px 10px rgba(155, 35, 234, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Flagship Programmes</p>
+              <h3 style={{ margin: '0 0 3px 0', fontSize: '24px', fontWeight: '700', color: '#fff' }}>{stats.totalPrograms || 0}</h3>
+              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{stats.activePrograms || 0} Active • {stats.inactivePrograms || 0} Inactive</p>
+            </div>
+            <div style={{ position: 'absolute', right: '12px', top: '12px', opacity: 0.14 }}>
+              <FiActivity size={26} color="#fff" />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Attendance Summary (Today) */}
-      <div className="attendance-summary-section">
-        <div className="attendance-summary-title">Attendance (Today)</div>
-        <div className="attendance-summary-cards">
-          <div className="attendance-summary-card" style={{ '--from': '#3f87ff', '--to': '#22c1c3' }} onClick={() => navigate('/staff')}>
-            <div className="dashboard-tile-content">
-              <div className="dashboard-tile-label">Total Emp</div>
-              <div className="dashboard-tile-value">{stats.totalStaff || 0}</div>
-              <div className="dashboard-tile-sub">{formatPercent(stats.totalStaff || 0, stats.totalStaff || 0)}</div>
+      {/* Section 1: Schemes Overview */}
+      <div style={{ marginBottom: '14px' }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '8px', 
+          marginBottom: '12px',
+          paddingLeft: '0px'
+        }}>
+          <FiFileText size={20} style={{ color: '#2e7d32', fontWeight: 'bold' }} />
+          <h2 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1a1a2e' }}>Schemes Overview</h2>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
+          {/* Total Schemes Card */}
+          <div 
+            onClick={() => navigate('/schemes')}
+            style={{
+              background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+              borderRadius: '10px',
+              padding: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 3px 10px rgba(67, 233, 123, 0.2)',
+              position: 'relative',
+              overflow: 'hidden',
+              minHeight: '90px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 5px 14px rgba(67, 233, 123, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 3px 10px rgba(67, 233, 123, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Total Schemes</p>
+              <h3 style={{ margin: '0 0 3px 0', fontSize: '23px', fontWeight: '700', color: '#fff' }}>{schemesSummary.total.total}</h3>
+              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatCSBreakdown(schemesSummary.total.central, schemesSummary.total.state)}</p>
             </div>
-            <div className="dashboard-tile-icon" aria-hidden="true"><FiUsers /></div>
           </div>
 
-          <div className="attendance-summary-card" style={{ '--from': '#43e97b', '--to': '#38f9d7' }} onClick={() => navigate('/attendance?period=today') }>
-            <div className="dashboard-tile-content">
-              <div className="dashboard-tile-label">Present</div>
-              <div className="dashboard-tile-value">{stats.todayAttendance?.present || 0}</div>
-              <div className="dashboard-tile-sub">{formatPercent(stats.todayAttendance?.present || 0, stats.totalStaff || 0)}</div>
+          {/* Active Schemes Card */}
+          <div 
+            onClick={() => navigate('/schemes?status=active')}
+            style={{
+              background: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)',
+              borderRadius: '10px',
+              padding: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 3px 10px rgba(247, 151, 30, 0.2)',
+              position: 'relative',
+              overflow: 'hidden',
+              minHeight: '90px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 5px 14px rgba(247, 151, 30, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 3px 10px rgba(247, 151, 30, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Active Schemes</p>
+              <h3 style={{ margin: '0 0 3px 0', fontSize: '23px', fontWeight: '700', color: '#fff' }}>{schemesSummary.active.total}</h3>
+              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatCSBreakdown(schemesSummary.active.central, schemesSummary.active.state)}</p>
             </div>
-            <div className="dashboard-tile-icon" aria-hidden="true"><FiUserCheck /></div>
           </div>
 
-          <div className="attendance-summary-card" style={{ '--from': '#ff416c', '--to': '#ff4b2b' }} onClick={() => navigate('/attendance?period=today') }>
-            <div className="dashboard-tile-content">
-              <div className="dashboard-tile-label">Absent</div>
-              <div className="dashboard-tile-value">{stats.todayAttendance?.absent || 0}</div>
-              <div className="dashboard-tile-sub">{formatPercent(stats.todayAttendance?.absent || 0, stats.totalStaff || 0)}</div>
+          {/* Inactive Schemes Card */}
+          <div 
+            onClick={() => navigate('/schemes?status=inactive')}
+            style={{
+              background: 'linear-gradient(135deg, #5f72bd 0%, #9b23ea 100%)',
+              borderRadius: '10px',
+              padding: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 3px 10px rgba(155, 35, 234, 0.2)',
+              position: 'relative',
+              overflow: 'hidden',
+              minHeight: '90px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 5px 14px rgba(155, 35, 234, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 3px 10px rgba(155, 35, 234, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Inactive Schemes</p>
+              <h3 style={{ margin: '0 0 3px 0', fontSize: '23px', fontWeight: '700', color: '#fff' }}>{schemesSummary.inactive.total}</h3>
+              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatCSBreakdown(schemesSummary.inactive.central, schemesSummary.inactive.state)}</p>
             </div>
-            <div className="dashboard-tile-icon" aria-hidden="true"><FiActivity /></div>
-          </div>
-
-          <div className="attendance-summary-card" style={{ '--from': '#f7971e', '--to': '#ffd200' }} onClick={() => navigate('/attendance?period=today') }>
-            <div className="dashboard-tile-content">
-              <div className="dashboard-tile-label">Late (after 10:30)</div>
-              <div className="dashboard-tile-value">{stats.todayAttendance?.late || 0}</div>
-              <div className="dashboard-tile-sub">{formatPercent(stats.todayAttendance?.late || 0, stats.totalStaff || 0)}</div>
-            </div>
-            <div className="dashboard-tile-icon" aria-hidden="true"><FiClock /></div>
-          </div>
-
-          <div className="attendance-summary-card" style={{ '--from': '#00b09b', '--to': '#96c93d' }} onClick={() => navigate('/attendance?period=today') }>
-            <div className="dashboard-tile-content">
-              <div className="dashboard-tile-label">Emp Leave</div>
-              <div className="dashboard-tile-value">{stats.todayAttendance?.onLeave || 0}</div>
-              <div className="dashboard-tile-sub">{formatPercent(stats.todayAttendance?.onLeave || 0, stats.totalStaff || 0)}</div>
-            </div>
-            <div className="dashboard-tile-icon" aria-hidden="true"><FiMapPin /></div>
           </div>
         </div>
       </div>
 
-      {/* Budget Summary (Central/State) */}
-      <div className="budget-summary-section">
-        <div className="budget-summary-title">Budget</div>
-        <div className="budget-summary-cards">
-          <div className="budget-summary-card" style={{ '--from': '#9b23ea', '--to': '#5f72bd' }} onClick={() => navigate('/budget')}>
-            <div className="dashboard-tile-content">
-              <div className="dashboard-tile-label">Total Budget</div>
-              <div className="dashboard-tile-value">{formatCurrency(budgetSummary.total.total)}</div>
-              <div className="dashboard-tile-sub">{formatCSBudgetBreakdown(budgetSummary.total.central, budgetSummary.total.state)}</div>
+      {/* Section 2: Budget Overview */}
+      <div style={{ marginBottom: '14px' }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '8px', 
+          marginBottom: '12px',
+          paddingLeft: '0px'
+        }}>
+          <BiRupee size={20} style={{ color: '#9b23ea', fontWeight: 'bold' }} />
+          <h2 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1a1a2e' }}>Budget Overview</h2>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
+          {/* Total Budget Card */}
+          <div 
+            onClick={() => navigate('/budget')}
+            style={{
+              background: 'linear-gradient(135deg, #9b23ea 0%, #5f72bd 100%)',
+              borderRadius: '10px',
+              padding: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 3px 10px rgba(155, 35, 234, 0.2)',
+              position: 'relative',
+              overflow: 'hidden',
+              minHeight: '90px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 5px 14px rgba(155, 35, 234, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 3px 10px rgba(155, 35, 234, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Total Budget</p>
+              <h3 style={{ margin: '0 0 3px 0', fontSize: '20px', fontWeight: '700', color: '#fff' }}>{formatCurrency(budgetSummary.total.total)}</h3>
+              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatCSBudgetBreakdown(budgetSummary.total.central, budgetSummary.total.state)}</p>
             </div>
-            <div className="dashboard-tile-icon" aria-hidden="true"><BiRupee /></div>
           </div>
 
-          <div className="budget-summary-card" style={{ '--from': '#00b09b', '--to': '#96c93d' }} onClick={() => navigate('/budget')}>
-            <div className="dashboard-tile-content">
-              <div className="dashboard-tile-label">Budget Utilized</div>
-              <div className="dashboard-tile-value">{formatCurrency(budgetSummary.utilized.total)}</div>
-              <div className="dashboard-tile-sub">{formatCSBudgetBreakdown(budgetSummary.utilized.central, budgetSummary.utilized.state)}</div>
+          {/* Utilized Budget Card */}
+          <div 
+            onClick={() => navigate('/budget')}
+            style={{
+              background: 'linear-gradient(135deg, #00b09b 0%, #96c93d 100%)',
+              borderRadius: '10px',
+              padding: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 3px 10px rgba(0, 176, 155, 0.2)',
+              position: 'relative',
+              overflow: 'hidden',
+              minHeight: '90px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 5px 14px rgba(0, 176, 155, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 3px 10px rgba(0, 176, 155, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Budget Utilized</p>
+              <h3 style={{ margin: '0 0 3px 0', fontSize: '20px', fontWeight: '700', color: '#fff' }}>{formatCurrency(budgetSummary.utilized.total)}</h3>
+              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatCSBudgetBreakdown(budgetSummary.utilized.central, budgetSummary.utilized.state)}</p>
             </div>
-            <div className="dashboard-tile-icon" aria-hidden="true"><FiTrendingUp /></div>
           </div>
 
-          <div className="budget-summary-card" style={{ '--from': '#3f87ff', '--to': '#6a5af9' }} onClick={() => navigate('/budget')}>
-            <div className="dashboard-tile-content">
-              <div className="dashboard-tile-label">Remaining Budget</div>
-              <div className="dashboard-tile-value">{formatCurrency(budgetSummary.remaining.total)}</div>
-              <div className="dashboard-tile-sub">{formatCSBudgetBreakdown(budgetSummary.remaining.central, budgetSummary.remaining.state)}</div>
+          {/* Remaining Budget Card */}
+          <div 
+            onClick={() => navigate('/budget')}
+            style={{
+              background: 'linear-gradient(135deg, #3f87ff 0%, #6a5af9 100%)',
+              borderRadius: '10px',
+              padding: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 3px 10px rgba(63, 135, 255, 0.2)',
+              position: 'relative',
+              overflow: 'hidden',
+              minHeight: '90px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 5px 14px rgba(63, 135, 255, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 3px 10px rgba(63, 135, 255, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Remaining Budget</p>
+              <h3 style={{ margin: '0 0 3px 0', fontSize: '20px', fontWeight: '700', color: '#fff' }}>{formatCurrency(budgetSummary.remaining.total)}</h3>
+              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatCSBudgetBreakdown(budgetSummary.remaining.central, budgetSummary.remaining.state)}</p>
             </div>
-            <div className="dashboard-tile-icon" aria-hidden="true"><BiWallet /></div>
           </div>
         </div>
       </div>
 
-      {/* Budget Breakdown (Estimated / Sanction / Pending) */}
-      <div className="budget-summary-section">
-        <div className="budget-summary-title">Budget Breakdown</div>
-        <div className="budget-summary-cards">
-          <div className="budget-summary-card" style={{ '--from': '#f39c12', '--to': '#e67e22' }} onClick={() => navigate('/budget')}>
-            <div className="dashboard-tile-content">
-              <div className="dashboard-tile-label">Estimated Budget</div>
-              <div className="dashboard-tile-value">{formatCurrency(budgetBreakdown.estimated.total)}</div>
-              <div className="dashboard-tile-sub">{formatCSBudgetBreakdown(budgetBreakdown.estimated.central, budgetBreakdown.estimated.state)}</div>
+      {/* Section 3: Attendance Overview (Today) */}
+      <div style={{ marginBottom: '14px' }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '8px', 
+          marginBottom: '12px',
+          paddingLeft: '0px'
+        }}>
+          <FiUserCheck size={20} style={{ color: '#3f87ff', fontWeight: 'bold' }} />
+          <h2 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1a1a2e' }}>Attendance (Today)</h2>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
+          {/* Total Employees Card */}
+          <div 
+            onClick={() => navigate('/staff')}
+            style={{
+              background: 'linear-gradient(135deg, #3f87ff 0%, #22c1c3 100%)',
+              borderRadius: '10px',
+              padding: '12px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 3px 10px rgba(63, 135, 255, 0.2)',
+              position: 'relative',
+              overflow: 'hidden',
+              minHeight: '85px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 5px 14px rgba(63, 135, 255, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 3px 10px rgba(63, 135, 255, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <p style={{ margin: '0 0 4px 0', fontSize: '10px', color: 'rgba(255,255,255,0.85)', fontWeight: '500' }}>Total Emp</p>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '20px', fontWeight: '700', color: '#fff' }}>{stats.totalStaff || 0}</h3>
+              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatPercent(stats.totalStaff || 0, stats.totalStaff || 0)}</p>
             </div>
-            <div className="dashboard-tile-icon" aria-hidden="true"><BiRupee /></div>
           </div>
 
-          <div className="budget-summary-card" style={{ '--from': '#27ae60', '--to': '#229954' }} onClick={() => navigate('/budget')}>
-            <div className="dashboard-tile-content">
-              <div className="dashboard-tile-label">Budget Sanction</div>
-              <div className="dashboard-tile-value">{formatCurrency(budgetBreakdown.sanction.total)}</div>
-              <div className="dashboard-tile-sub">{formatCSBudgetBreakdown(budgetBreakdown.sanction.central, budgetBreakdown.sanction.state)}</div>
+          {/* Present Card */}
+          <div 
+            onClick={() => navigate('/attendance?status=present')}
+            style={{
+              background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+              borderRadius: '10px',
+              padding: '12px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 3px 10px rgba(67, 233, 123, 0.2)',
+              position: 'relative',
+              overflow: 'hidden',
+              minHeight: '85px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 5px 14px rgba(67, 233, 123, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 3px 10px rgba(67, 233, 123, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <p style={{ margin: '0 0 4px 0', fontSize: '10px', color: 'rgba(255,255,255,0.85)', fontWeight: '500' }}>Present</p>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '20px', fontWeight: '700', color: '#fff' }}>{stats.todayAttendance?.present || 0}</h3>
+              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatPercent(stats.todayAttendance?.present || 0, stats.totalStaff || 0)}</p>
             </div>
-            <div className="dashboard-tile-icon" aria-hidden="true"><FiTrendingUp /></div>
           </div>
 
-          <div className="budget-summary-card" style={{ '--from': '#e74c3c', '--to': '#c0392b' }} onClick={() => navigate('/budget')}>
-            <div className="dashboard-tile-content">
-              <div className="dashboard-tile-label">Pending Budget</div>
-              <div className="dashboard-tile-value">{formatCurrency(budgetBreakdown.pending.total)}</div>
-              <div className="dashboard-tile-sub">{formatCSBudgetBreakdown(budgetBreakdown.pending.central, budgetBreakdown.pending.state)}</div>
+          {/* Absent Card */}
+          <div 
+            onClick={() => navigate('/attendance?status=absent')}
+            style={{
+              background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)',
+              borderRadius: '10px',
+              padding: '12px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 3px 10px rgba(255, 65, 108, 0.2)',
+              position: 'relative',
+              overflow: 'hidden',
+              minHeight: '85px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 5px 14px rgba(255, 65, 108, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 3px 10px rgba(255, 65, 108, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <p style={{ margin: '0 0 4px 0', fontSize: '10px', color: 'rgba(255,255,255,0.85)', fontWeight: '500' }}>Absent</p>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '20px', fontWeight: '700', color: '#fff' }}>{stats.todayAttendance?.absent || 0}</h3>
+              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatPercent(stats.todayAttendance?.absent || 0, stats.totalStaff || 0)}</p>
             </div>
-            <div className="dashboard-tile-icon" aria-hidden="true"><BiWallet /></div>
+          </div>
+
+          {/* Late Card */}
+          <div 
+            onClick={() => navigate('/attendance?status=late')}
+            style={{
+              background: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)',
+              borderRadius: '10px',
+              padding: '12px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 3px 10px rgba(247, 151, 30, 0.2)',
+              position: 'relative',
+              overflow: 'hidden',
+              minHeight: '85px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 5px 14px rgba(247, 151, 30, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 3px 10px rgba(247, 151, 30, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <p style={{ margin: '0 0 4px 0', fontSize: '10px', color: 'rgba(255,255,255,0.85)', fontWeight: '500' }}>Late (after 10:30)</p>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '20px', fontWeight: '700', color: '#fff' }}>{stats.todayAttendance?.late || 0}</h3>
+              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatPercent(stats.todayAttendance?.late || 0, stats.totalStaff || 0)}</p>
+            </div>
+          </div>
+
+          {/* On Leave Card */}
+          <div 
+            onClick={() => navigate('/attendance?status=leave')}
+            style={{
+              background: 'linear-gradient(135deg, #00b09b 0%, #96c93d 100%)',
+              borderRadius: '10px',
+              padding: '12px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 3px 10px rgba(0, 176, 155, 0.2)',
+              position: 'relative',
+              overflow: 'hidden',
+              minHeight: '85px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 5px 14px rgba(0, 176, 155, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 3px 10px rgba(0, 176, 155, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <p style={{ margin: '0 0 4px 0', fontSize: '10px', color: 'rgba(255,255,255,0.85)', fontWeight: '500' }}>On Leave</p>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '20px', fontWeight: '700', color: '#fff' }}>{stats.todayAttendance?.onLeave || 0}</h3>
+              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatPercent(stats.todayAttendance?.onLeave || 0, stats.totalStaff || 0)}</p>
+            </div>
           </div>
         </div>
       </div>
-{/* <div className="stat-card teal" style={{ cursor: 'pointer' }} onClick={() => navigate('/attendance?period=today')}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ backgroundColor: '#e0f2f1', padding: '12px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <FiClock style={{ color: '#00897B', fontSize: '24px' }} />
-            </div>
-            <div>
-              <h4 style={{ fontSize: '24px', fontWeight: '700', margin: 0 }}>{stats.todayAttendance?.total || 0}</h4>
-              <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#666' }}>Today's Attendance</p>
-              
-               <div className="trend" style={{ fontSize: '11px', display: 'flex', gap: '6px', flexWrap: 'nowrap' }}>
-              <span onClick={(e) => { e.stopPropagation(); navigate('/attendance?status=present'); }} style={{ color: '#4CAF50', cursor: 'pointer' }}>{stats.todayAttendance?.present || 0} Present</span>
-              <span onClick={(e) => { e.stopPropagation(); navigate('/attendance?status=late'); }} style={{ color: '#FF9800', cursor: 'pointer' }}>{stats.todayAttendance?.late || 0} Late</span>
-              <span onClick={(e) => { e.stopPropagation(); navigate('/attendance?status=absent'); }} style={{ color: '#F44336', cursor: 'pointer' }}>{stats.todayAttendance?.absent || 0} Absent</span>
-              <span onClick={(e) => { e.stopPropagation(); navigate('/attendance?status=half_day'); }} style={{ color: '#9C27B0', cursor: 'pointer' }}>{stats.todayAttendance?.halfDay || 0} Half</span>
-            </div>
-            </div>
-          </div>
-        </div> */}
-      {/* Quick Stats - Hidden as cards moved to main grid */}
-      {/* <div className="quick-stats" style={{ display: 'none' }}>
 
-        <div className="quick-stat">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ backgroundColor: '#e8f5e9', padding: '10px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <FiTrendingUp style={{ color: '#4CAF50', fontSize: '20px' }} />
+      {/* Section 4: Budget Breakdown (Estimated / Sanction / Pending) */}
+      <div style={{ marginBottom: '14px' }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '10px', 
+          marginBottom: '12px',
+          paddingLeft: '0px'
+        }}>
+          <BiWallet size={24} style={{ color: '#f39c12', fontWeight: 'bold' }} />
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1a1a2e' }}>Budget Breakdown</h2>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
+          {/* Estimated Budget Card */}
+          <div 
+            onClick={() => navigate('/budget')}
+            style={{
+              background: 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)',
+              borderRadius: '10px',
+              padding: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 3px 10px rgba(243, 156, 18, 0.2)',
+              position: 'relative',
+              overflow: 'hidden',
+              minHeight: '90px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 5px 14px rgba(243, 156, 18, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 3px 10px rgba(243, 156, 18, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <p style={{ margin: '0 0 4px 0', fontSize: '10px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Estimated Budget</p>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '18px', fontWeight: '700', color: '#fff' }}>{formatCurrency(budgetBreakdown.estimated.total)}</h3>
+              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatCSBudgetBreakdown(budgetBreakdown.estimated.central, budgetBreakdown.estimated.state)}</p>
             </div>
-            <div>
-              <h4>{formatCurrency(quickStats.utilizedBudget)}</h4>
-              <p>Budget Utilized ({quickStats.budgetUtilization}%)</p>
+          </div>
+
+          {/* Sanction Budget Card */}
+          <div 
+            onClick={() => navigate('/budget')}
+            style={{
+              background: 'linear-gradient(135deg, #27ae60 0%, #229954 100%)',
+              borderRadius: '10px',
+              padding: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 3px 10px rgba(39, 174, 96, 0.2)',
+              position: 'relative',
+              overflow: 'hidden',
+              minHeight: '90px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 5px 14px rgba(39, 174, 96, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 3px 10px rgba(39, 174, 96, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <p style={{ margin: '0 0 4px 0', fontSize: '10px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Budget Sanction</p>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '18px', fontWeight: '700', color: '#fff' }}>{formatCurrency(budgetBreakdown.sanction.total)}</h3>
+              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatCSBudgetBreakdown(budgetBreakdown.sanction.central, budgetBreakdown.sanction.state)}</p>
+            </div>
+          </div>
+
+          {/* Pending Budget Card */}
+          <div 
+            onClick={() => navigate('/budget')}
+            style={{
+              background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+              borderRadius: '10px',
+              padding: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 3px 10px rgba(231, 76, 60, 0.2)',
+              position: 'relative',
+              overflow: 'hidden',
+              minHeight: '90px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 5px 14px rgba(231, 76, 60, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 3px 10px rgba(231, 76, 60, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <p style={{ margin: '0 0 4px 0', fontSize: '10px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Pending Budget</p>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '18px', fontWeight: '700', color: '#fff' }}>{formatCurrency(budgetBreakdown.pending.total)}</h3>
+              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatCSBudgetBreakdown(budgetBreakdown.pending.central, budgetBreakdown.pending.state)}</p>
             </div>
           </div>
         </div>
-        <div className="quick-stat">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ backgroundColor: '#e3f2fd', padding: '10px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <BiWallet style={{ color: '#2196F3', fontSize: '20px' }} />
-            </div>
-            <div>
-              <h4>{formatCurrency(quickStats.remainingBudget)}</h4>
-              <p>Remaining Budget</p>
-            </div>
-          </div>
+      </div>
+
+      {/* Section 5: Charts - 2x2 Grid Layout */}
+      <div style={{ marginBottom: '14px' }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '10px', 
+          marginBottom: '12px',
+          paddingLeft: '0px'
+        }}>
+          <FiBarChart2 size={24} style={{ color: '#2196F3', fontWeight: 'bold' }} />
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1a1a2e' }}>Analytics & Charts</h2>
         </div>
-        <div className="quick-stat">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ backgroundColor: '#fff3e0', padding: '10px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <FiMapPin style={{ color: '#FF9800', fontSize: '20px' }} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          {/* Chart 1: HOD Revenue - Donut Chart */}
+          <div style={{
+            backgroundColor: '#fff',
+            borderRadius: '12px',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+            overflow: 'hidden'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              padding: '12px 16px',
+              borderBottom: '1px solid #f0f0f0'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#1a1a2e', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FiPieChart size={16} style={{ color: '#9b23ea' }} /> 
+                HOD Revenue 
+                {chartFilters.revenue.hod_id && <span style={{ fontSize: '11px', color: '#666', fontWeight: 'normal' }}>({allHODs.find(h => h.id === parseInt(chartFilters.revenue.hod_id))?.name})</span>}
+              </h3>
+              <div style={{ position: 'relative' }}>
+                <FiFilter 
+                  style={{ cursor: 'pointer', color: chartFilters.revenue.hod_id ? '#2e7d32' : '#666', fontSize: '16px' }} 
+                  title="Filter" 
+                  onClick={(e) => { e.stopPropagation(); toggleFilterDropdown('revenue'); }}
+                />
+                {renderFilterDropdown('revenue')}
+              </div>
             </div>
-            <div>
-              <h4>{quickStats.districtsCovered}</h4>
-              <p>Districts Covered</p>
-            </div>
-          </div>
-        </div>
-        <div className="quick-stat" onClick={() => window.location.href = '/beneficiaries'} style={{ cursor: 'pointer' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ backgroundColor: '#fce4ec', padding: '10px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <HiOutlineUserGroup style={{ color: '#E91E63', fontSize: '20px' }} />
-            </div>
-            <div>
-              <h4>{formatBeneficiaries(quickStats.beneficiaries)}</h4>
-              <p>Beneficiaries</p>
-              <p>View & manage</p>
-            </div>
-          </div>
-        </div> */}
-        {/* <div className="quick-stat">
-          <h4>{quickStats.attendanceRate}%</h4>
-          <p>Attendance Rate</p>
-        </div> */}
-        
-      {/* </div> */}
-      {/* Charts - 2x2 Grid Layout */}
-      <div className="charts-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-        {/* Chart 1: HOD Revenue - Donut Chart with center text */}
-        <div className="chart-card">
-          <div className="chart-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3><FiPieChart /> HOD Revenue {chartFilters.revenue.hod_id && <span style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>({allHODs.find(h => h.id === parseInt(chartFilters.revenue.hod_id))?.name})</span>}</h3>
-            <div className="chart-filter-container" style={{ position: 'relative' }}>
-              <FiFilter 
-                style={{ cursor: 'pointer', color: chartFilters.revenue.hod_id ? '#2e7d32' : '#666', fontSize: '18px' }} 
-                title="Filter" 
-                onClick={(e) => { e.stopPropagation(); toggleFilterDropdown('revenue'); }}
-              />
-              {renderFilterDropdown('revenue')}
-            </div>
-          </div>
-          <div className="chart-card-body">
-            <div className="chart-container" style={{ cursor: 'pointer', height: '300px', overflow: 'hidden', position: 'relative' }}>
+            <div style={{ padding: '14px', height: '260px' }}>
               <Doughnut data={hodRevenueChartData} options={hodRevenuePieOptions} plugins={[ChartDataLabels, revenueCenterTextPlugin]} />
             </div>
           </div>
-        </div>
 
-        {/* Chart 2: Schemes (HOD wise) - Bar + Line Combined Chart */}
-        <div className="chart-card">
-          <div className="chart-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-              <h3><FiBarChart2 /> {isSchemeWiseView ? 'Schemes (Scheme wise)' : 'Schemes (HOD wise)'} {chartFilters.schemes.hod_id && <span style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>({allHODs.find(h => h.id === parseInt(chartFilters.schemes.hod_id))?.name})</span>}</h3>
-              {isSchemeWiseView && (
-                <div style={{ display: 'flex', gap: '10px', fontSize: '11px' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: 'rgba(76, 175, 80, 0.8)' }}></span> Completed
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: 'rgba(255, 193, 7, 0.8)' }}></span> Planned
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: 'rgba(33, 150, 243, 0.8)' }}></span> Active
-                  </span>
-                </div>
-              )}
+          {/* Chart 2: Schemes (HOD wise) - Bar + Line Combined Chart */}
+          <div style={{
+            backgroundColor: '#fff',
+            borderRadius: '12px',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+            overflow: 'hidden'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              padding: '12px 16px',
+              borderBottom: '1px solid #f0f0f0'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#1a1a2e', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <FiBarChart2 size={16} style={{ color: '#2196F3' }} />
+                  {isSchemeWiseView ? 'Schemes (Scheme wise)' : 'Schemes (HOD wise)'} 
+                  {chartFilters.schemes.hod_id && <span style={{ fontSize: '11px', color: '#666', fontWeight: 'normal' }}>({allHODs.find(h => h.id === parseInt(chartFilters.schemes.hod_id))?.name})</span>}
+                </h3>
+                {isSchemeWiseView && (
+                  <div style={{ display: 'flex', gap: '10px', fontSize: '11px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: 'rgba(76, 175, 80, 0.8)' }}></span> Completed
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: 'rgba(255, 193, 7, 0.8)' }}></span> Planned
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: 'rgba(33, 150, 243, 0.8)' }}></span> Active
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div style={{ position: 'relative' }}>
+                <FiFilter 
+                  style={{ cursor: 'pointer', color: chartFilters.schemes.hod_id ? '#2e7d32' : '#666', fontSize: '16px' }} 
+                  title="Filter" 
+                  onClick={(e) => { e.stopPropagation(); toggleFilterDropdown('schemes'); }}
+                />
+                {renderFilterDropdown('schemes')}
+              </div>
             </div>
-            <div className="chart-filter-container" style={{ position: 'relative' }}>
-              <FiFilter 
-                style={{ cursor: 'pointer', color: chartFilters.schemes.hod_id ? '#2e7d32' : '#666', fontSize: '18px' }} 
-                title="Filter" 
-                onClick={(e) => { e.stopPropagation(); toggleFilterDropdown('schemes'); }}
-              />
-              {renderFilterDropdown('schemes')}
-            </div>
-          </div>
-          <div className="chart-card-body">
-            <div className="chart-container" style={{ cursor: 'pointer', height: '300px' }}>
+            <div style={{ padding: '14px', height: '260px' }}>
               <Bar data={schemesHODBarLineData} options={schemesBarLineOptions} />
             </div>
           </div>
-        </div>
 
-        {/* Chart 3: Budget (HOD wise) */}
-        <div className="chart-card">
-          <div className="chart-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3><FiPieChart /> Budget (HOD wise) {chartFilters.budget.hod_id && <span style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>({allHODs.find(h => h.id === parseInt(chartFilters.budget.hod_id))?.name})</span>}</h3>
-            <div className="chart-filter-container" style={{ position: 'relative' }}>
-              <FiFilter 
-                style={{ cursor: 'pointer', color: chartFilters.budget.hod_id ? '#2e7d32' : '#666', fontSize: '18px' }} 
-                title="Filter" 
-                onClick={(e) => { e.stopPropagation(); toggleFilterDropdown('budget'); }}
-              />
-              {renderFilterDropdown('budget')}
+          {/* Chart 3: Budget (HOD wise) */}
+          <div style={{
+            backgroundColor: '#fff',
+            borderRadius: '12px',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+            overflow: 'hidden'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              padding: '12px 16px',
+              borderBottom: '1px solid #f0f0f0'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#1a1a2e', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FiPieChart size={16} style={{ color: '#00b09b' }} /> 
+                Budget (HOD wise) 
+                {chartFilters.budget.hod_id && <span style={{ fontSize: '11px', color: '#666', fontWeight: 'normal' }}>({allHODs.find(h => h.id === parseInt(chartFilters.budget.hod_id))?.name})</span>}
+              </h3>
+              <div style={{ position: 'relative' }}>
+                <FiFilter 
+                  style={{ cursor: 'pointer', color: chartFilters.budget.hod_id ? '#2e7d32' : '#666', fontSize: '16px' }} 
+                  title="Filter" 
+                  onClick={(e) => { e.stopPropagation(); toggleFilterDropdown('budget'); }}
+                />
+                {renderFilterDropdown('budget')}
+              </div>
             </div>
-          </div>
-          <div className="chart-card-body">
-            <div className="chart-container" style={{ cursor: 'pointer', height: '390px' }}>
+            <div style={{ padding: '14px', height: '310px' }}>
               <Pie data={budgetHODPieChartData} options={pieChartOptions} />
             </div>
           </div>
-        </div>
 
-        {/* Chart 4: Attendance (HOD wise) - Donut Chart with center text */}
-        <div className="chart-card">
-          <div className="chart-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3><FiPieChart /> Attendance (HOD wise) {chartFilters.attendance.hod_id && <span style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>({allHODs.find(h => h.id === parseInt(chartFilters.attendance.hod_id))?.name})</span>}</h3>
-            <div className="chart-filter-container" style={{ position: 'relative' }}>
-              <FiFilter 
-                style={{ cursor: 'pointer', color: chartFilters.attendance.hod_id ? '#2e7d32' : '#666', fontSize: '18px' }} 
-                title="Filter" 
-                onClick={(e) => { e.stopPropagation(); toggleFilterDropdown('attendance'); }}
-              />
-              {renderFilterDropdown('attendance')}
+          {/* Chart 4: Attendance (HOD wise) - Donut Chart */}
+          <div style={{
+            backgroundColor: '#fff',
+            borderRadius: '12px',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+            overflow: 'hidden'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              padding: '12px 16px',
+              borderBottom: '1px solid #f0f0f0'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#1a1a2e', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FiPieChart size={16} style={{ color: '#f39c12' }} /> 
+                Attendance (HOD wise) 
+                {chartFilters.attendance.hod_id && <span style={{ fontSize: '11px', color: '#666', fontWeight: 'normal' }}>({allHODs.find(h => h.id === parseInt(chartFilters.attendance.hod_id))?.name})</span>}
+              </h3>
+              <div style={{ position: 'relative' }}>
+                <FiFilter 
+                  style={{ cursor: 'pointer', color: chartFilters.attendance.hod_id ? '#2e7d32' : '#666', fontSize: '16px' }} 
+                  title="Filter" 
+                  onClick={(e) => { e.stopPropagation(); toggleFilterDropdown('attendance'); }}
+                />
+                {renderFilterDropdown('attendance')}
+              </div>
             </div>
-          </div>
-          <div className="chart-card-body">
-            <div className="chart-container" style={{ cursor: 'pointer', height: '390px' }}>
+            <div style={{ padding: '14px', height: '310px' }}>
               <Pie data={attendanceHODPieChartData} options={attendancePieOptions} plugins={[ChartDataLabels, centerTextPlugin]} />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Tables */}
-      {/* HOD Revenue Table */}
-      {/*  */}
-
+      {/* Modal for detailed views */}
       <ListModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}

@@ -207,10 +207,10 @@ router.post('/change-password', async (req, res) => {
       [newPassword, userId]
     );
 
-    // Send notification email
+    // Send notification email with new password
     try {
       const { sendPasswordChangedEmail } = require('../services/emailService');
-      await sendPasswordChangedEmail(user.email, user.name);
+      await sendPasswordChangedEmail(user.email, user.name, newPassword);
     } catch (emailError) {
       console.error('Error sending password changed email:', emailError);
     }
@@ -225,12 +225,126 @@ router.post('/change-password', async (req, res) => {
   }
 });
 
+// Forgot password - Send OTP to user's email
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // Find user by email
+    const [users] = await db.query(
+      'SELECT id, name, email FROM users WHERE email = ? AND status = "active"',
+      [email]
+    );
+
+    if (users.length === 0) {
+      // For security, don't reveal if email exists
+      return res.json({
+        success: true,
+        message: 'If an account exists with this email, an OTP has been sent.'
+      });
+    }
+
+    const user = users[0];
+
+    // Generate OTP
+    const otp = generateOTP();
+
+    // Store OTP in database with expiration time (10 minutes)
+    const expiryTime = new Date(Date.now() + 10 * 60 * 1000);
+    await db.query(
+      'UPDATE users SET reset_otp = ?, reset_otp_expiry = ? WHERE id = ?',
+      [otp, expiryTime, user.id]
+    );
+
+    // Send OTP email
+    try {
+      const { sendForgotPasswordEmail } = require('../services/emailService');
+      await sendForgotPasswordEmail(user.email, user.name, otp);
+    } catch (emailError) {
+      console.error('Error sending forgot password email:', emailError);
+    }
+
+    res.json({
+      success: true,
+      message: 'OTP sent to your email. Please check your inbox.',
+      userId: user.id
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Reset password with OTP
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ error: 'Email, OTP, and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters long' });
+    }
+
+    // Find user by email
+    const [users] = await db.query(
+      'SELECT id, name, email, reset_otp, reset_otp_expiry FROM users WHERE email = ?',
+      [email]
+    );
+
+    if (users.length === 0) {
+      return res.status(401).json({ error: 'Invalid email or OTP' });
+    }
+
+    const user = users[0];
+
+    // Verify OTP
+    if (!user.reset_otp || user.reset_otp !== otp) {
+      return res.status(401).json({ error: 'Invalid OTP' });
+    }
+
+    // Check if OTP is expired
+    if (new Date() > new Date(user.reset_otp_expiry)) {
+      return res.status(401).json({ error: 'OTP has expired. Please request a new one.' });
+    }
+
+    // Update password and clear OTP
+    await db.query(
+      'UPDATE users SET password = ?, reset_otp = NULL, reset_otp_expiry = NULL, password_changed = TRUE WHERE id = ?',
+      [newPassword, user.id]
+    );
+
+    // Send notification email with new password
+    try {
+      const { sendPasswordChangedEmail } = require('../services/emailService');
+      await sendPasswordChangedEmail(user.email, user.name, newPassword);
+    } catch (emailError) {
+      console.error('Error sending password changed email:', emailError);
+    }
+
+    res.json({
+      success: true,
+      message: 'Password reset successfully. You can now login with your new password.'
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Register new user (Admin only) - Creates user and optionally HOD/Staff record
+// Password is auto-generated and sent to user's email
 router.post('/register-user', authenticateJWT, requireRole('superadmin'), async (req, res) => {
   try {
-    const { username, email, password, name, role, hod_id, staff_id, category_id } = req.body;
+    const { username, email, name, role, hod_id, staff_id, category_id } = req.body;
 
-    if (!username || !email || !password || !name || !role) {
+    if (!username || !email || !name || !role) {
       return res.status(400).json({ error: 'All required fields must be provided' });
     }
 
@@ -248,6 +362,9 @@ router.post('/register-user', authenticateJWT, requireRole('superadmin'), async 
     if (existingUsers.length > 0) {
       return res.status(400).json({ error: 'Username or email already exists' });
     }
+
+    // Generate a random temporary password
+    const generatedPassword = Math.random().toString(36).slice(-10) + Math.random().toString(36).slice(-10).toUpperCase();
 
     // Start transaction
     await db.query('START TRANSACTION');
@@ -290,18 +407,18 @@ router.post('/register-user', authenticateJWT, requireRole('superadmin'), async 
         staffIdToLink = staffResult.insertId;
       }
 
-      // Create user account
+      // Create user account with generated password
       const [userResult] = await db.query(
         'INSERT INTO users (username, email, password, name, role, hod_id, staff_id, status, password_changed) VALUES (?, ?, ?, ?, ?, ?, ?, "active", FALSE)',
-        [username, email, password, name, role, hodIdToLink, staffIdToLink]
+        [username, email, generatedPassword, name, role, hodIdToLink, staffIdToLink]
       );
 
       await db.query('COMMIT');
 
-      // Send registration email
+      // Send registration email with generated password
       try {
         const { sendRegistrationEmail } = require('../services/emailService');
-        await sendRegistrationEmail(email, name, username, password);
+        await sendRegistrationEmail(email, name, username, generatedPassword);
       } catch (emailError) {
         console.error('Error sending registration email:', emailError);
         // Continue even if email fails
@@ -309,7 +426,7 @@ router.post('/register-user', authenticateJWT, requireRole('superadmin'), async 
 
       res.status(201).json({
         success: true,
-        message: 'User registered successfully. Registration email sent.',
+        message: 'User registered successfully. A temporary password has been sent to the user\'s email.',
         user: {
           id: userResult.insertId,
           username,

@@ -118,7 +118,7 @@ const emailTemplates = {
     </html>
   `,
 
-  passwordChanged: (name) => `
+  passwordChanged: (name, newPassword = null) => `
     <!DOCTYPE html>
     <html>
     <head>
@@ -128,6 +128,9 @@ const emailTemplates = {
         .header { background: #1b5e20; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
         .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
         .success-box { background: #d4edda; padding: 15px; border-left: 4px solid #28a745; margin: 20px 0; }
+        .password-box { background: #fff; padding: 15px; border: 2px solid #1b5e20; margin: 20px 0; text-align: center; border-radius: 6px; }
+        .password-label { font-size: 12px; color: #666; }
+        .password-value { font-size: 18px; font-weight: bold; color: #1b5e20; letter-spacing: 2px; font-family: monospace; }
         .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
       </style>
     </head>
@@ -143,7 +146,15 @@ const emailTemplates = {
             <p><strong>Your password has been successfully changed.</strong></p>
           </div>
           
-          <p>If you did not make this change, please contact the system administrator immediately.</p>
+          ${newPassword ? `
+          <div class="password-box">
+            <p class="password-label">Your New Password:</p>
+            <p class="password-value">${newPassword}</p>
+            <p style="font-size: 12px; color: #666; margin-top: 10px;">Please keep this password safe and secure.</p>
+          </div>
+          ` : ''}
+          
+          <p>If you did not make this change or did not request this, please contact the system administrator immediately.</p>
           
           <div class="footer">
             <p>© 2024 Government of Telangana. All Rights Reserved.</p>
@@ -197,9 +208,9 @@ const sendForgotPasswordEmail = async (email, name, otp) => {
 };
 
 // Send password changed notification
-const sendPasswordChangedEmail = async (email, name) => {
+const sendPasswordChangedEmail = async (email, name, newPassword = null) => {
   const subject = 'Password Changed - HOD Management System';
-  const html = emailTemplates.passwordChanged(name);
+  const html = emailTemplates.passwordChanged(name, newPassword);
   return await sendEmail(email, subject, html);
 };
 
