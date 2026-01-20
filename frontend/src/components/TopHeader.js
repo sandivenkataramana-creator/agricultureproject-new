@@ -126,7 +126,7 @@ const TopHeader = ({ user, onLogout, onToggleSidebar }) => {
         <div className="top-header-logo">
           <img src={process.env.REACT_APP_HEADER_LOGO || '/tglogo.png'} alt="Logo" style={{ height: 40, borderRadius: 8, marginRight: 12 }} />
           <div>
-            <h1>Telangana Agriculture and Co-opration Department</h1>
+            <h1>Telangana Agriculture and Co-operation Department</h1>
             <span>Telangana State</span>
           </div>
         </div>

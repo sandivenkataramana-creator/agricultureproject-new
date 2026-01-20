@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
-import { FiDownload, FiUpload, FiRefreshCw, FiTrash2, FiFileText } from 'react-icons/fi';
+import { FiDownload, FiUpload, FiRefreshCw, FiTrash2, FiFileText, FiEye, FiX } from 'react-icons/fi';
 import {
   getFlagshipProgrammes,
   getFlagshipProgrammesByDepartment,
@@ -23,6 +23,9 @@ const FlagshipProgrammes = () => {
   const [departmentInput, setDepartmentInput] = useState('');
   const [uploading, setUploading] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
+  const [viewDetailsModal, setViewDetailsModal] = useState(false);
+  const [selectedItemData, setSelectedItemData] = useState(null);
+  const [uploadSummary, setUploadSummary] = useState(null);
   const pageSize = 10;
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -39,9 +42,9 @@ const FlagshipProgrammes = () => {
       const params = selectedDepartment ? { department: selectedDepartment } : {};
       const response = await getFlagshipProgrammes(params);
       
-      // Separate programmes and reports
-      const progs = response.data.filter(item => !item.report_date) || [];
-      const reps = response.data.filter(item => item.report_date) || [];
+      // Separate programmes and reports based on type field
+      const progs = response.data.filter(item => item.type === 'programme' || (!item.type && !item.report_date)) || [];
+      const reps = response.data.filter(item => item.type === 'report' || item.report_date) || [];
       
       setProgrammes(progs);
       setReports(reps);
@@ -79,26 +82,109 @@ const FlagshipProgrammes = () => {
           const workbook = XLSX.read(e.target.result, { type: 'array' });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          const data = XLSX.utils.sheet_to_json(worksheet);
-
-          if (data.length === 0) {
+          
+          // Convert sheet to array of arrays to handle multi-row headers
+          const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+          
+          if (rawData.length < 3) {
             alert('No data found in the Excel file');
             setUploading(false);
             return;
           }
+          
+          // For multi-row headers, we need to combine section headers with column names
+          // Row 0: Section headers (Bills Preferred, Bills Cleared, Pending)
+          // Row 1: Actual column names (No. of Bills, Amount (Cr), etc.)
+          // Row 2+: Data rows
+          
+          const sectionHeaders = rawData[0]; // First row with merged section titles
+          const columnHeaders = rawData[1];  // Second row with actual column names
+          
+          // Create combined headers
+          const headers = columnHeaders.map((colName, idx) => {
+            const col = colName?.toString().trim();
+            const section = sectionHeaders[idx]?.toString().trim();
+            
+            // If we have both section and column name, combine them
+            if (section && col && section !== col) {
+              return `${section} - ${col}`;
+            }
+            // If only column name exists
+            if (col) {
+              return col;
+            }
+            // If only section exists
+            if (section) {
+              return section;
+            }
+            // Fallback
+            return `Column_${idx + 1}`;
+          });
+          
+          // Look backwards for section headers for empty column names
+          for (let i = 0; i < headers.length; i++) {
+            if (headers[i].startsWith('Column_') && columnHeaders[i]?.toString().trim()) {
+              // This column has a name but no section, use the column name
+              headers[i] = columnHeaders[i].toString().trim();
+            } else if (headers[i].startsWith('Column_')) {
+              // Find the nearest non-empty section header to the left
+              for (let j = i - 1; j >= 0; j--) {
+                const prevSection = sectionHeaders[j]?.toString().trim();
+                if (prevSection) {
+                  const colName = columnHeaders[i]?.toString().trim();
+                  headers[i] = colName ? `${prevSection} - ${colName}` : `${prevSection}_${i + 1}`;
+                  break;
+                }
+              }
+            }
+          }
+          
+          // Convert data rows to objects using the headers (skip first 2 rows)
+          const data = [];
+          for (let i = 2; i < rawData.length; i++) {
+            const row = rawData[i];
+            // Skip completely empty rows
+            if (row.every(cell => !cell || cell.toString().trim() === '')) {
+              continue;
+            }
+            
+            const rowObj = {};
+            headers.forEach((header, idx) => {
+              const cellValue = row[idx];
+              rowObj[header] = cellValue !== undefined && cellValue !== null ? cellValue : '';
+            });
+            data.push(rowObj);
+          }
 
-          // Upload data
+          if (data.length === 0) {
+            alert('No data rows found in the Excel file');
+            setUploading(false);
+            return;
+          }
+
+          // Get programme/report name from filename or use first sheet name
+          const fileNameWithoutExt = file.name.replace(/\.(xlsx|xls|csv)$/i, '');
+          const programmeName = fileNameWithoutExt || sheetName;
+
+          // Send entire dataset as a single record
           const response = await uploadFlagshipData({
-            file_data: data,
+            file_data: [data], // Wrap the entire array in another array so backend treats it as single record
             file_name: file.name,
             import_type: importType,
-            department_name: departmentInput || 'General'
+            department_name: departmentInput || 'General',
+            programme_name: programmeName,
+            record_count: data.length
           });
 
           if (response.data.success) {
-            alert(`Successfully imported ${response.data.successful} records`);
+            alert(`Successfully imported ${data.length} records from ${file.name}`);
             setFileData(null);
             setDepartmentInput('');
+            setUploadSummary({
+              total: data.length,
+              successful: data.length,
+              failed: 0
+            });
             fetchProgrammes();
           }
         } catch (error) {
@@ -141,6 +227,83 @@ const FlagshipProgrammes = () => {
     } catch (error) {
       alert('Error exporting data');
     }
+  };
+
+  const handleViewDetails = (item) => {
+    let parsedData = item.data;
+    if (typeof item.data === 'string') {
+      try {
+        parsedData = JSON.parse(item.data);
+      } catch (e) {
+        parsedData = item.data;
+      }
+    }
+    setSelectedItemData({
+      ...item,
+      parsedData: parsedData
+    });
+    setViewDetailsModal(true);
+  };
+
+  const renderDataTable = (data) => {
+    if (!data) return <p>No data available</p>;
+    
+    // If data is an array of objects
+    if (Array.isArray(data) && data.length > 0) {
+      const keys = Object.keys(data[0]);
+      return (
+        <div style={{ overflowX: 'auto', maxHeight: '500px', overflowY: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead style={{ position: 'sticky', top: 0, background: '#f5f5f5', zIndex: 1 }}>
+              <tr>
+                {keys.map((key, idx) => (
+                  <th key={idx} style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #ddd', fontWeight: '600' }}>
+                    {key}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row, rowIdx) => (
+                <tr key={rowIdx} style={{ borderBottom: '1px solid #eee' }}>
+                  {keys.map((key, colIdx) => (
+                    <td key={colIdx} style={{ padding: '10px', borderBottom: '1px solid #eee' }}>
+                      {row[key] !== null && row[key] !== undefined ? String(row[key]) : '-'}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+    
+    // If data is a single object
+    if (typeof data === 'object' && !Array.isArray(data)) {
+      return (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead style={{ background: '#f5f5f5' }}>
+              <tr>
+                <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #ddd', fontWeight: '600' }}>Field</th>
+                <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #ddd', fontWeight: '600' }}>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(data).map(([key, value], idx) => (
+                <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
+                  <td style={{ padding: '10px', fontWeight: '500' }}>{key}</td>
+                  <td style={{ padding: '10px' }}>{value !== null && value !== undefined ? String(value) : '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+    
+    return <p>{String(data)}</p>;
   };
 
   const displayData = activeTab === 'programmes' ? programmes : reports;
@@ -312,6 +475,24 @@ const FlagshipProgrammes = () => {
                 />
               </label>
             </div>
+            
+            {/* Upload Summary */}
+            {uploadSummary && (
+              <div style={{
+                marginTop: '15px',
+                padding: '12px',
+                background: '#e8f5e9',
+                borderRadius: '6px',
+                border: '1px solid #4caf50'
+              }}>
+                <h4 style={{ margin: '0 0 8px 0', color: '#2e7d32' }}>Upload Summary</h4>
+                <div style={{ display: 'flex', gap: '20px', fontSize: '14px' }}>
+                  <span><strong>Total Records:</strong> {uploadSummary.total}</span>
+                  <span style={{ color: '#4caf50' }}><strong>Successful:</strong> {uploadSummary.successful}</span>
+                  <span style={{ color: '#f44336' }}><strong>Failed:</strong> {uploadSummary.failed}</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -336,48 +517,86 @@ const FlagshipProgrammes = () => {
                   {activeTab === 'reports' && (
                     <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600' }}>Date</th>
                   )}
-                  <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600' }}>Data Preview</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600' }}>Records Count</th>
                   <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {paginatedData.map((item, idx) => (
-                  <tr key={item.id} style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '12px' }}>{item.department_name || '-'}</td>
-                    <td style={{ padding: '12px', fontWeight: '500' }}>
-                      {item.programme_name || item.report_name || '-'}
-                    </td>
-                    {activeTab === 'reports' && (
-                      <td style={{ padding: '12px' }}>
-                        {item.report_date ? new Date(item.report_date).toLocaleDateString('en-IN') : '-'}
+                {paginatedData.map((item, idx) => {
+                  let recordCount = 0;
+                  try {
+                    const data = typeof item.data === 'string' ? JSON.parse(item.data) : item.data;
+                    recordCount = Array.isArray(data) ? data.length : 1;
+                  } catch (e) {
+                    recordCount = 0;
+                  }
+                  
+                  return (
+                    <tr key={item.id} style={{ borderBottom: '1px solid #eee' }}>
+                      <td style={{ padding: '12px' }}>{item.department_name || '-'}</td>
+                      <td style={{ padding: '12px', fontWeight: '500' }}>
+                        {item.programme_name || item.report_name || '-'}
                       </td>
-                    )}
-                    <td style={{ padding: '12px', fontSize: '12px', color: '#666', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {typeof item.data === 'string' ? item.data : JSON.stringify(item.data).substring(0, 100)}...
-                    </td>
-                    <td style={{ padding: '12px', textAlign: 'center' }}>
-                      {isSuperAdmin && (
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          style={{
-                            padding: '6px 12px',
-                            background: '#F44336',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            fontSize: '12px'
-                          }}
-                        >
-                          <FiTrash2 size={14} /> Delete
-                        </button>
+                      {activeTab === 'reports' && (
+                        <td style={{ padding: '12px' }}>
+                          {item.report_date ? new Date(item.report_date).toLocaleDateString('en-IN') : '-'}
+                        </td>
                       )}
-                    </td>
-                  </tr>
-                ))}
+                      <td style={{ padding: '12px' }}>
+                        <span style={{
+                          padding: '4px 12px',
+                          background: '#e3f2fd',
+                          color: '#1976d2',
+                          borderRadius: '12px',
+                          fontSize: '13px',
+                          fontWeight: '600'
+                        }}>
+                          {recordCount} {recordCount === 1 ? 'record' : 'records'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                          <button
+                            onClick={() => handleViewDetails(item)}
+                            style={{
+                              padding: '6px 12px',
+                              background: '#2196F3',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              fontSize: '12px'
+                            }}
+                          >
+                            <FiEye size={14} /> View Details
+                          </button>
+                          {isSuperAdmin && (
+                            <button
+                              onClick={() => handleDelete(item.id)}
+                              style={{
+                                padding: '6px 12px',
+                                background: '#F44336',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                fontSize: '12px'
+                              }}
+                            >
+                              <FiTrash2 size={14} /> Delete
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -478,6 +697,106 @@ const FlagshipProgrammes = () => {
           </div>
         )}
       </div>
+
+      {/* View Details Modal */}
+      {viewDetailsModal && selectedItemData && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: '12px',
+            width: '90%',
+            maxWidth: '1200px',
+            maxHeight: '90vh',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid #e0e0e0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: '#f5f5f5'
+            }}>
+              <div>
+                <h2 style={{ margin: '0 0 5px 0', fontSize: '20px' }}>
+                  {selectedItemData.programme_name || selectedItemData.report_name}
+                </h2>
+                <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
+                  Department: {selectedItemData.department_name || 'N/A'}
+                </p>
+              </div>
+              <button
+                onClick={() => setViewDetailsModal(false)}
+                style={{
+                  background: '#f44336',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '36px',
+                  height: '36px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  fontSize: '20px'
+                }}
+              >
+                <FiX />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{
+              padding: '24px',
+              overflowY: 'auto',
+              flex: 1
+            }}>
+              {renderDataTable(selectedItemData.parsedData)}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '16px 24px',
+              borderTop: '1px solid #e0e0e0',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              background: '#f5f5f5'
+            }}>
+              <button
+                onClick={() => setViewDetailsModal(false)}
+                style={{
+                  padding: '10px 24px',
+                  background: '#667eea',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '600'
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

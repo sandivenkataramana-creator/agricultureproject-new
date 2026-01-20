@@ -16,25 +16,44 @@ router.get('/', async (req, res) => {
     const department = req.query.department;
     const status = req.query.status || 'active';
     
-    let query = 'SELECT * FROM flagship_programmes WHERE status = ?';
-    const params = [status];
+    // Query programmes
+    let progQuery = 'SELECT *, "programme" as type FROM flagship_programmes WHERE status = ?';
+    const progParams = [status];
     
     if (department) {
-      query += ' AND (department_id = ? OR department_name = ?)';
-      params.push(department, department);
+      progQuery += ' AND (department_id = ? OR department_name = ?)';
+      progParams.push(department, department);
     }
     
-    query += ' ORDER BY created_at DESC';
+    progQuery += ' ORDER BY created_at DESC';
     
-    const [results] = await db.query(query, params);
+    // Query reports
+    let repQuery = 'SELECT *, "report" as type FROM flagship_reports WHERE status = ?';
+    const repParams = [status];
     
-    // Parse JSON data for each record
-    const programmes = results.map(prog => ({
-      ...prog,
-      data: typeof prog.data_json === 'string' ? JSON.parse(prog.data_json) : prog.data_json
-    }));
+    if (department) {
+      repQuery += ' AND (department_id = ? OR department_name = ?)';
+      repParams.push(department, department);
+    }
     
-    res.json(programmes);
+    repQuery += ' ORDER BY created_at DESC';
+    
+    const [programmes] = await db.query(progQuery, progParams);
+    const [reports] = await db.query(repQuery, repParams);
+    
+    // Parse JSON data and combine results
+    const allData = [
+      ...programmes.map(prog => ({
+        ...prog,
+        data: typeof prog.data_json === 'string' ? JSON.parse(prog.data_json) : prog.data_json
+      })),
+      ...reports.map(rep => ({
+        ...rep,
+        data: typeof rep.data_json === 'string' ? JSON.parse(rep.data_json) : rep.data_json
+      }))
+    ];
+    
+    res.json(allData);
   } catch (error) {
     console.error('Error fetching flagship programmes:', error);
     res.status(500).json({ error: error.message });
@@ -48,7 +67,9 @@ router.post('/upload', superAdminOnly, async (req, res) => {
       file_data,          // Array of objects from Excel
       file_name,
       import_type,        // 'programme' or 'report'
-      department_name
+      department_name,
+      programme_name,     // Name for the entire dataset
+      record_count        // Count of records in the Excel
     } = req.body;
     
     if (!file_data || !Array.isArray(file_data) || file_data.length === 0) {
@@ -61,7 +82,12 @@ router.post('/upload', superAdminOnly, async (req, res) => {
     
     const batchId = generateBatchId();
     const userId = req.user?.id || 1;
-    const columnMapping = Object.keys(file_data[0] || {});
+    
+    // Check if file_data is wrapped (indicating entire dataset should be one record)
+    const isWrappedData = file_data.length === 1 && Array.isArray(file_data[0]);
+    const actualData = isWrappedData ? file_data[0] : file_data;
+    const totalRecords = isWrappedData ? actualData.length : file_data.length;
+    const columnMapping = Object.keys(actualData[0] || {});
     
     let successCount = 0;
     let failedRecords = [];
@@ -75,53 +101,88 @@ router.post('/upload', superAdminOnly, async (req, res) => {
         `INSERT INTO flagship_import_metadata 
          (import_batch_id, file_name, total_records, status, column_mapping, import_type, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [batchId, file_name, file_data.length, 'processing', JSON.stringify(columnMapping), import_type, userId]
+        [batchId, file_name, totalRecords, 'processing', JSON.stringify(columnMapping), import_type, userId]
       );
       
-      // Insert records based on type
-      if (import_type === 'programme') {
-        for (let i = 0; i < file_data.length; i++) {
-          try {
-            const record = file_data[i];
-            await db.query(
-              `INSERT INTO flagship_programmes
-               (department_name, programme_name, import_batch_id, data_json, status, created_by)
-               VALUES (?, ?, ?, ?, ?, ?)`,
-              [
-                department_name || record.department || 'General',
-                record.programme_name || record.name || `Record ${i + 1}`,
-                batchId,
-                JSON.stringify(record),
-                'active',
-                userId
-              ]
-            );
-            successCount++;
-          } catch (err) {
-            failedRecords.push({ record: i + 1, error: err.message });
-          }
+      // If wrapped data, store as single record with all rows
+      if (isWrappedData) {
+        if (import_type === 'programme') {
+          await db.query(
+            `INSERT INTO flagship_programmes
+             (department_name, programme_name, import_batch_id, data_json, status, created_by)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+              department_name || 'General',
+              programme_name || file_name.replace(/\.(xlsx|xls|csv)$/i, ''),
+              batchId,
+              JSON.stringify(actualData),
+              'active',
+              userId
+            ]
+          );
+        } else if (import_type === 'report') {
+          await db.query(
+            `INSERT INTO flagship_reports
+             (department_name, report_name, report_date, import_batch_id, data_json, status, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [
+              department_name || 'General',
+              programme_name || file_name.replace(/\.(xlsx|xls|csv)$/i, ''),
+              new Date().toISOString().split('T')[0],
+              batchId,
+              JSON.stringify(actualData),
+              'active',
+              userId
+            ]
+          );
         }
-      } else if (import_type === 'report') {
-        for (let i = 0; i < file_data.length; i++) {
-          try {
-            const record = file_data[i];
-            await db.query(
-              `INSERT INTO flagship_reports
-               (department_name, report_name, report_date, import_batch_id, data_json, status, created_by)
-               VALUES (?, ?, ?, ?, ?, ?, ?)`,
-              [
-                department_name || record.department || 'General',
-                record.report_name || record.name || `Report ${i + 1}`,
-                record.report_date || new Date().toISOString().split('T')[0],
-                batchId,
-                JSON.stringify(record),
-                'active',
-                userId
-              ]
-            );
-            successCount++;
-          } catch (err) {
-            failedRecords.push({ record: i + 1, error: err.message });
+        successCount = 1;
+      } else {
+        // Original behavior: Insert records individually
+        if (import_type === 'programme') {
+          for (let i = 0; i < file_data.length; i++) {
+            try {
+              const record = file_data[i];
+              await db.query(
+                `INSERT INTO flagship_programmes
+                 (department_name, programme_name, import_batch_id, data_json, status, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [
+                  department_name || record.department || 'General',
+                  record.programme_name || record.name || `Record ${i + 1}`,
+                  batchId,
+                  JSON.stringify(record),
+                  'active',
+                  userId
+                ]
+              );
+              successCount++;
+            } catch (err) {
+              failedRecords.push({ record: i + 1, error: err.message });
+            }
+          }
+        } else if (import_type === 'report') {
+          for (let i = 0; i < file_data.length; i++) {
+            try {
+              const record = file_data[i];
+              await db.query(
+                `INSERT INTO flagship_reports
+                 (department_name, report_name, report_date, import_batch_id, data_json, status, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [
+                  department_name || record.department || 'General',
+                  record.report_name || record.name || `Report ${i + 1}`,
+                  record.report_date || new Date().toISOString().split('T')[0],
+                  batchId,
+                  JSON.stringify(record),
+                  'active',
+                  userId
+                ]
+              );
+              successCount++;
+            } catch (err) {
+              failedRecords.push({ record: i + 1, error: err.message });
+            }
           }
         }
       }
@@ -145,7 +206,7 @@ router.post('/upload', superAdminOnly, async (req, res) => {
       res.json({
         success: true,
         batch_id: batchId,
-        total: file_data.length,
+        total: totalRecords,
         successful: successCount,
         failed: failedRecords.length,
         message: `Successfully imported ${successCount}/${file_data.length} records`
@@ -301,21 +362,32 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Delete programme (must be last of the /:id routes)
+// Delete programme or report (must be last of the /:id routes)
 router.delete('/:id', superAdminOnly, async (req, res) => {
   try {
-    const result = await db.query(
+    // Try deleting from programmes table first
+    const progResult = await db.query(
       'DELETE FROM flagship_programmes WHERE id = ?',
       [req.params.id]
     );
     
-    if (result[0].affectedRows === 0) {
-      return res.status(404).json({ message: 'Programme not found' });
+    if (progResult[0].affectedRows > 0) {
+      return res.json({ message: 'Programme deleted successfully' });
     }
     
-    res.json({ message: 'Programme deleted successfully' });
+    // If not found in programmes, try reports table
+    const repResult = await db.query(
+      'DELETE FROM flagship_reports WHERE id = ?',
+      [req.params.id]
+    );
+    
+    if (repResult[0].affectedRows > 0) {
+      return res.json({ message: 'Report deleted successfully' });
+    }
+    
+    return res.status(404).json({ message: 'Record not found' });
   } catch (error) {
-    console.error('Error deleting programme:', error);
+    console.error('Error deleting record:', error);
     res.status(500).json({ error: error.message });
   }
 });

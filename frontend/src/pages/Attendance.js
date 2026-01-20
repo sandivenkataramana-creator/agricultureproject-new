@@ -109,11 +109,16 @@ const Attendance = () => {
         if (!params[key] || params[key] === 'all') delete params[key];
       });
 
+      console.log('Fetching attendance with params:', params); // Debug log
+
       const [attendanceRes, statsRes, deptRes] = await Promise.all([
         getAttendanceFiltered(params),
         getAttendanceStatistics(params),
         getDepartmentWiseAttendance(params)
       ]);
+
+      console.log('Attendance data:', attendanceRes.data); // Debug log
+      console.log('Statistics data:', statsRes.data); // Debug log
 
       setAttendance(attendanceRes.data || []);
       setStatistics(statsRes.data || null);
@@ -248,7 +253,10 @@ const Attendance = () => {
         departments.add(hod.department);
       }
     });
-    return Array.from(departments).sort();
+    const result = Array.from(departments).sort();
+    console.log('HOD List:', hodList); // Debug log
+    console.log('Unique Departments:', result); // Debug log
+    return result;
   }, [hodList]);
 
   // Chart options
@@ -1318,7 +1326,7 @@ const Attendance = () => {
       </div>
 
       {/* Department-wise Summary */}
-      {statistics?.departmentWise && statistics.departmentWise.length > 0 && (
+      {/* {statistics?.departmentWise && statistics.departmentWise.length > 0 && (
         <div className="chart-card" style={{ marginBottom: '20px' }}>
           <h3 style={{ marginBottom: '15px' }}>Department-wise Summary</h3>
           <div className="table-wrapper" style={{ maxHeight: '250px', overflow: 'auto' }}>
@@ -1369,7 +1377,7 @@ const Attendance = () => {
             </table>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Attendance Records Table */}
       <div className="table-card">

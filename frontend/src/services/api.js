@@ -1,6 +1,5 @@
 import axios from 'axios';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+import { API_BASE_URL } from '../config/config';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -11,7 +10,7 @@ const api = axios.create({
 
 // Add token to requests if available (except for public endpoints)
 api.interceptors.request.use((config) => {
-  // List of public endpoints that don't require authentication
+  // List of public endpoints that don't require authentication (use exact match to avoid false positives)
   const publicEndpoints = [
     '/auth/login',
     '/auth/register',
@@ -19,19 +18,27 @@ api.interceptors.request.use((config) => {
     '/auth/reset-password'
   ];
   
-  // Check if the request URL matches any public endpoint
+  // Check if the request URL matches any public endpoint (exact endpoint match, not substring)
   const isPublicEndpoint = publicEndpoints.some(endpoint => 
-    config.url && config.url.includes(endpoint)
+    config.url && (config.url === endpoint || config.url.endsWith(endpoint))
   );
   
   // Only add token if not a public endpoint
   if (!isPublicEndpoint) {
-    const user = localStorage.getItem('user');
-    if (user) {
-      const userData = JSON.parse(user);
-      if (userData.token) {
-        config.headers.Authorization = `Bearer ${userData.token}`;
+    try {
+      const user = localStorage.getItem('user');
+      if (user) {
+        const userData = JSON.parse(user);
+        if (userData && userData.token) {
+          config.headers.Authorization = `Bearer ${userData.token}`;
+        } else {
+          console.warn('User data found but no token present:', userData ? Object.keys(userData) : 'null');
+        }
+      } else {
+        console.warn('No user found in localStorage for protected request:', config.url);
       }
+    } catch (e) {
+      console.error('Error reading user from localStorage:', e);
     }
   }
   return config;

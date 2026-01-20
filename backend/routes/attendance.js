@@ -293,7 +293,7 @@ router.get('/statistics', async (req, res) => {
 // Get department-wise attendance with employee lists
 router.get('/department-wise', async (req, res) => {
   try {
-    const { period, employee_type } = req.query;
+    const { period, employee_type, department } = req.query;
 
     const dateCondition = (() => {
       if (period === 'today') return 'DATE(a.date) = CURDATE()';
@@ -308,8 +308,18 @@ router.get('/department-wise', async (req, res) => {
     const safeEmployeeType = ['regular', 'outsource'].includes(String(employee_type || '').toLowerCase())
       ? String(employee_type).toLowerCase()
       : null;
-    const whereClause = safeEmployeeType ? `WHERE s.employee_type = ${db.escape(safeEmployeeType)}` : '';
+    
+    let whereClause = '';
     const params = [];
+    
+    if (safeEmployeeType) {
+      whereClause += `WHERE s.employee_type = '${safeEmployeeType}'`;
+    }
+    
+    if (department) {
+      whereClause += whereClause ? ` AND h.department = ?` : `WHERE h.department = ?`;
+      params.push(department);
+    }
 
     // Get all departments with their attendance counts and employee details
     const [departments] = await db.query(`

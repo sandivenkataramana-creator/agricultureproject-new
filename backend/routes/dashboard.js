@@ -753,24 +753,27 @@ router.get('/revenue-by-hod', async (req, res) => {
     const year = req.query.year;
     const hodId = req.query.hod_id;
     const params = [];
-    let whereClause = '';
+    let hodFilter = '';
+    let revenueFilter = '';
     
     if (hodId) {
-      whereClause = 'WHERE h.id = ?';
+      hodFilter = 'WHERE h.id = ?';
       params.push(hodId);
     }
-    
+
+    // Build revenue filter for year
     if (year && year !== 'All') {
-      whereClause += whereClause ? ' AND YEAR(r.date) = ?' : 'WHERE YEAR(r.date) = ?';
+      revenueFilter = `AND (r.date IS NULL OR YEAR(r.date) = ?)`;
       params.push(parseInt(year));
     }
 
     const [results] = await db.query(`
-      SELECT h.name as hod_name, h.department, COALESCE(SUM(r.amount), 0) as total_revenue
+      SELECT h.id, h.name as hod_name, h.department, COALESCE(SUM(r.amount), 0) as total_revenue
       FROM hods h
-      LEFT JOIN revenue r ON h.id = r.hod_id
-      ${whereClause}
+      LEFT JOIN revenue r ON h.id = r.hod_id ${revenueFilter}
+      ${hodFilter}
       GROUP BY h.id, h.name, h.department
+      ORDER BY total_revenue DESC
     `, params);
     res.json(results);
   } catch (error) {
@@ -785,15 +788,17 @@ router.get('/revenue-by-department', async (req, res) => {
     const year = req.query.year;
     const hodId = req.query.hod_id;
     const params = [];
-    let whereClause = '';
+    let hodFilter = '';
+    let revenueFilter = '';
     
     if (hodId) {
-      whereClause = 'WHERE h.id = ?';
+      hodFilter = 'WHERE h.id = ?';
       params.push(hodId);
     }
-    
+
+    // Build revenue filter for year
     if (year && year !== 'All') {
-      whereClause += whereClause ? ' AND YEAR(r.date) = ?' : 'WHERE YEAR(r.date) = ?';
+      revenueFilter = `AND (r.date IS NULL OR YEAR(r.date) = ?)`;
       params.push(parseInt(year));
     }
 
@@ -803,8 +808,8 @@ router.get('/revenue-by-department', async (req, res) => {
         COALESCE(SUM(r.amount), 0) as total_revenue,
         COUNT(DISTINCT h.id) as hod_count
       FROM hods h
-      LEFT JOIN revenue r ON h.id = r.hod_id
-      ${whereClause}
+      LEFT JOIN revenue r ON h.id = r.hod_id ${revenueFilter}
+      ${hodFilter}
       GROUP BY h.department
       ORDER BY total_revenue DESC
     `, params);
