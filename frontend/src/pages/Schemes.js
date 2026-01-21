@@ -73,8 +73,17 @@ const Schemes = () => {
   }, [location.search]);
 
   useEffect(() => {
+    // Fetch data on component mount
     fetchData();
-  }, []);
+    // Also refetch whenever filterType changes to ensure data is fresh
+    if (filterType === 'central-sponsored-scheme') {
+      fetchCentralSchemes();
+    } else if (filterType === 'state-scheme') {
+      fetchStateSchemeData();
+    } else if (filterType === 'revenue') {
+      fetchRevenueData();
+    }
+  }, [filterType]);
 
   useEffect(() => {
     // Refetch data when financial year changes
@@ -130,6 +139,14 @@ const Schemes = () => {
       const financialData = financialRes && Array.isArray(financialRes) ? financialRes : [];
       console.log('Financial data fetched, updating state:', { count: financialData.length, firstItem: financialData[0] });
       setFinancialRows(financialData);
+      
+      // Also refetch state schemes and revenue data to keep them in sync
+      if (filterType === 'state-scheme') {
+        fetchStateSchemeData();
+      } else if (filterType === 'revenue') {
+        fetchRevenueData();
+      }
+      
       setError(null);
     } catch (err) {
       console.error('Error fetching data:', err);
