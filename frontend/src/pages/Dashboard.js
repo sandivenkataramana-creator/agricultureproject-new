@@ -877,6 +877,260 @@ const Dashboard = () => {
     }]
   };
 
+  // Donut chart for Overview Cards - HODs
+  const hodsOverviewChartData = {
+    labels: ['Active', 'Inactive'],
+    datasets: [{
+      data: [stats.activeHods || 0, (stats.totalHods || 0) - (stats.activeHods || 0)],
+      backgroundColor: ['#4CAF50', '#9E9E9E'],
+      borderWidth: 2,
+      borderColor: '#ffffff',
+      cutout: '65%'
+    }]
+  };
+
+  // Donut chart for Overview Cards - Programs
+  const programsOverviewChartData = {
+    labels: ['Active', 'Inactive'],
+    datasets: [{
+      data: [stats.activePrograms || 0, stats.inactivePrograms || 0],
+      backgroundColor: ['#9b23ea', '#E0E0E0'],
+      borderWidth: 2,
+      borderColor: '#ffffff',
+      cutout: '65%'
+    }]
+  };
+
+  // Donut chart for Schemes Overview - Total vs Others
+  const schemesOverviewChartData = {
+    labels: ['Total', 'Active', 'Inactive'],
+    datasets: [{
+      data: [schemesSummary.total.total || 0, schemesSummary.active.total || 0, schemesSummary.inactive.total || 0],
+      backgroundColor: ['#43e97b', '#f7971e', '#5f72bd'],
+      borderWidth: 2,
+      borderColor: '#ffffff',
+      cutout: '65%'
+    }]
+  };
+
+  // Donut chart for Budget Overview
+  const budgetOverviewChartData = {
+    labels: ['Total Budget', 'Utilized', 'Remaining'],
+    datasets: [{
+      data: [
+        budgetSummary.total.total || 0,
+        budgetSummary.utilized.total || 0,
+        budgetSummary.remaining.total || 0
+      ],
+      backgroundColor: ['#9b23ea', '#00b09b', '#3f87ff'],
+      borderWidth: 2,
+      borderColor: '#ffffff',
+      cutout: '65%'
+    }]
+  };
+
+  // Donut chart for Attendance Overview
+  const attendanceOverviewChartData = {
+    labels: ['Present', 'Absent', 'Late', 'Leave'],
+    datasets: [{
+      data: [
+        stats.todayAttendance?.present || 0,
+        stats.todayAttendance?.absent || 0,
+        stats.todayAttendance?.late || 0,
+        stats.todayAttendance?.onLeave || 0
+      ],
+      backgroundColor: ['#4CAF50', '#f44336', '#f7971e', '#00b09b'],
+      borderWidth: 2,
+      borderColor: '#ffffff',
+      cutout: '65%'
+    }]
+  };
+
+  // Overview chart options with center text
+  const overviewChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          padding: 12,
+          usePointStyle: true,
+          pointStyle: 'circle',
+          font: {
+            size: 11,
+            weight: '600'
+          }
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        padding: 10,
+        bodyFont: {
+          size: 12
+        },
+        callbacks: {
+          label: function(context) {
+            const label = context.label || '';
+            const value = context.parsed || 0;
+            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+            return `${label}: ${value} (${percentage}%)`;
+          }
+        }
+      },
+      datalabels: {
+        color: '#fff',
+        font: {
+          size: 12,
+          weight: 'bold'
+        },
+        anchor: 'center',
+        align: 'center',
+        formatter: function(value, context) {
+          const total = context.dataset.data.reduce((a, b) => a + b, 0);
+          const percentage = total > 0 ? ((value / total) * 100).toFixed(0) : 0;
+          return percentage > 5 ? `${percentage}%` : '';
+        },
+        display: function(context) {
+          return context.dataset.data[context.dataIndex] > 0;
+        }
+      }
+    }
+  };
+
+  // Custom plugin for center text in overview donut charts
+  const overviewCenterTextPlugin = {
+    id: 'overviewCenterText',
+    afterDraw: function(chart) {
+      const { ctx, chartArea, width, height } = chart;
+      if (!chartArea) return;
+      
+      const dataset = chart.data.datasets[0];
+      if (!dataset) return;
+      
+      const total = dataset.data.reduce((a, b) => Number(a) + Number(b), 0);
+      
+      ctx.save();
+      const centerX = (chartArea.left + chartArea.right) / 2;
+      const centerY = (chartArea.top + chartArea.bottom) / 2;
+      
+      // Draw total in center
+      ctx.font = 'bold 22px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#333';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(total, centerX, centerY);
+      
+      ctx.restore();
+    }
+  };
+
+  // Schemes donut chart data
+  const filteredSchemesDataForChart = getFilteredSchemesData();
+  const schemesHODChartData = {
+    labels: filteredSchemesDataForChart.map(item => item.hod_name || 'Unknown'),
+    datasets: [{
+      data: filteredSchemesDataForChart.map(item => item.scheme_count || 0),
+      backgroundColor: generateDynamicColors(filteredSchemesDataForChart.length),
+      borderWidth: 2,
+      borderColor: '#ffffff',
+      hoverOffset: 8,
+      spacing: 2,
+      cutout: '60%'
+    }]
+  };
+
+  // Schemes chart options with center text
+  const schemesChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'right',
+        labels: {
+          padding: 20,
+          usePointStyle: true,
+          pointStyle: 'circle',
+          font: {
+            size: 12,
+            weight: '600',
+            family: "'Roboto', sans-serif"
+          },
+          generateLabels: function(chart) {
+            const data = chart.data;
+            if (data.labels.length && data.datasets.length) {
+              const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+              return data.labels.map((label, i) => {
+                const value = data.datasets[0].data[i];
+                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                return {
+                  text: `${label} - ${percentage}%`,
+                  fillStyle: data.datasets[0].backgroundColor[i],
+                  strokeStyle: data.datasets[0].borderColor || '#ffffff',
+                  lineWidth: data.datasets[0].borderWidth || 0,
+                  hidden: false,
+                  index: i
+                };
+              });
+            }
+            return [];
+          }
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        padding: 12,
+        titleFont: {
+          size: 14,
+          weight: 'bold'
+        },
+        bodyFont: {
+          size: 13
+        },
+        callbacks: {
+          label: function(context) {
+            const label = context.label || '';
+            const value = context.parsed || 0;
+            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+            return `${label}: ${value} schemes (${percentage}%)`;
+          }
+        }
+      },
+      datalabels: {
+        color: '#fff',
+        font: {
+          size: 13,
+          weight: 'bold',
+          family: "'Segoe UI', sans-serif"
+        },
+        anchor: 'center',
+        align: 'center',
+        offset: 0,
+        formatter: function(value, context) {
+          const total = context.dataset.data.reduce((a, b) => a + b, 0);
+          const percentage = total > 0 ? ((value / total) * 100).toFixed(0) : 0;
+          return percentage > 3 ? `${percentage}%` : '';
+        },
+        display: function(context) {
+          return context.dataset.data[context.dataIndex] > 0;
+        }
+      }
+    },
+    onClick: (event, elements) => {
+      if (elements.length > 0) {
+        const element = elements[0];
+        const chart = event.chart;
+        const index = element.index;
+        const hodName = filteredSchemesDataForChart[index]?.hod_name;
+        if (hodName) {
+          handleChartClick('schemesByHOD', hodName);
+        }
+      }
+    }
+  };
+
   // Custom plugin for center text in revenue donut chart
   const revenueCenterTextPlugin = {
     id: 'revenueCenterText',
@@ -1802,6 +2056,202 @@ if (!isNaN(safeTotal)) {
     }
   };
 
+  // Budget Status Chart - Utilized vs Remaining
+  const budgetStatusChartData = {
+    labels: ['Utilized', 'Remaining'],
+    datasets: [{
+      data: [
+        budgetSummary?.utilized?.total || 0,
+        budgetSummary?.remaining?.total || 0
+      ],
+      backgroundColor: ['#26A69A', '#42A5F5'],
+      borderWidth: 2,
+      borderColor: '#ffffff'
+    }]
+  };
+
+  // Custom plugin for Budget Status center text
+  const budgetStatusCenterTextPlugin = {
+    id: 'budgetStatusCenterText',
+    afterDraw: function(chart) {
+      const { ctx, chartArea, width, height } = chart;
+      if (!chartArea) return;
+      
+      const dataset = chart.data.datasets[0];
+      if (!dataset) return;
+      
+      const total = dataset.data.reduce((a, b) => Number(a) + Number(b), 0);
+      
+      ctx.save();
+      
+      // Calculate center - use chartArea for accurate center
+      const centerX = (chartArea.left + chartArea.right) / 2;
+      const centerY = (chartArea.top + chartArea.bottom) / 2;
+      
+      // Format total budget
+      let displayValue = '₹0';
+      const safeTotal = Number(total);
+      if (!isNaN(safeTotal)) {
+        if (safeTotal >= 10000000) displayValue = `₹${(safeTotal / 10000000).toFixed(2)} Cr`;
+        else if (safeTotal >= 100000) displayValue = `₹${(safeTotal / 100000).toFixed(2)} L`;
+        else displayValue = `₹${safeTotal.toLocaleString()}`;
+      }
+      
+      // Draw "Total Budget" text
+      ctx.font = 'bold 11px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#666';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Total Budget', centerX, centerY - 10);
+      
+      // Draw total amount
+      ctx.font = 'bold 16px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#333';
+      ctx.fillText(displayValue, centerX, centerY + 12);
+      
+      ctx.restore();
+    }
+  };
+
+  // Attendance Today Bar Chart Data
+  const attendanceTodayChartData = {
+    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+    datasets: [{
+      label: 'Present',
+      data: [stats?.todayAttendance?.present || 0, stats?.todayAttendance?.present || 0, stats?.todayAttendance?.present || 0, stats?.todayAttendance?.present || 0, stats?.todayAttendance?.present || 0],
+      backgroundColor: '#9C27B0',
+      borderRadius: 4,
+      borderSkipped: false
+    }, {
+      label: 'Absent',
+      data: [stats?.todayAttendance?.absent || 0, stats?.todayAttendance?.absent || 0, stats?.todayAttendance?.absent || 0, stats?.todayAttendance?.absent || 0, stats?.todayAttendance?.absent || 0],
+      backgroundColor: '#EF5350',
+      borderRadius: 4,
+      borderSkipped: false
+    }, {
+      label: 'Late',
+      data: [stats?.todayAttendance?.late || 0, stats?.todayAttendance?.late || 0, stats?.todayAttendance?.late || 0, stats?.todayAttendance?.late || 0, stats?.todayAttendance?.late || 0],
+      backgroundColor: '#FFA500',
+      borderRadius: 4,
+      borderSkipped: false
+    }, {
+      label: 'Leave',
+      data: [stats?.todayAttendance?.onLeave || 0, stats?.todayAttendance?.onLeave || 0, stats?.todayAttendance?.onLeave || 0, stats?.todayAttendance?.onLeave || 0, stats?.todayAttendance?.onLeave || 0],
+      backgroundColor: '#26A69A',
+      borderRadius: 4,
+      borderSkipped: false
+    }]
+  };
+
+  // Schemes Status Bar Chart Data
+  const schemesStatusChartData = {
+    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+    datasets: [{
+      label: 'Infrastructure',
+      data: [3, 3, 3, 3, 3],
+      backgroundColor: '#26A69A',
+      borderRadius: 4,
+      borderSkipped: false
+    }, {
+      label: 'Education',
+      data: [2, 2, 2, 2, 2],
+      backgroundColor: '#EF5350',
+      borderRadius: 4,
+      borderSkipped: false
+    }, {
+      label: 'Healthcare',
+      data: [1, 1, 1, 1, 1],
+      backgroundColor: '#FF6B6B',
+      borderRadius: 4,
+      borderSkipped: false
+    }, {
+      label: 'Others',
+      data: [2, 2, 2, 2, 2],
+      backgroundColor: '#FFB74D',
+      borderRadius: 4,
+      borderSkipped: false
+    }]
+  };
+
+  // Bar Chart Options
+  const barChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: 'x',
+    interaction: {
+      intersect: false,
+      mode: 'index'
+    },
+    plugins: {
+      legend: {
+        position: 'top',
+        labels: {
+          padding: 15,
+          usePointStyle: true,
+          font: {
+            size: 12,
+            weight: '600'
+          }
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        padding: 10,
+        font: {
+          size: 12
+        },
+        cornerRadius: 4
+      },
+      datalabels: {
+        display: false
+      }
+    },
+    scales: {
+      x: {
+        stacked: true,
+        grid: {
+          display: false,
+          drawBorder: false
+        },
+        ticks: {
+          font: {
+            size: 11
+          }
+        }
+      },
+      y: {
+        stacked: true,
+        beginAtZero: true,
+        grid: {
+          color: 'rgba(0,0,0,0.05)',
+          drawBorder: false
+        },
+        ticks: {
+          font: {
+            size: 11
+          }
+        }
+      }
+    }
+  };
+
+  // Budget Breakdown Chart Data - Updated categories
+  const budgetBreakdownChartData = {
+    labels: ['Estimated', 'Central and State', 'Sanction', 'Pending', 'Utilization'],
+    datasets: [{
+      data: [
+        budgetSummary?.estimated?.total || 0,
+        budgetSummary?.centralAndState?.total || 0,
+        budgetSummary?.sanction?.total || 0,
+        budgetSummary?.pending?.total || 0,
+        budgetSummary?.utilized?.total || 0
+      ],
+      backgroundColor: ['#FFB74D', '#26A69A', '#2196F3', '#FF6B6B', '#66BB6A'],
+      borderWidth: 2,
+      borderColor: '#ffffff'
+    }]
+  };
+
   if (loading) {
     return (
       <div className="loading">
@@ -1813,622 +2263,289 @@ if (!isNaN(safeTotal)) {
   return (
     <div className="page-container" style={{ padding: '16px', backgroundColor: '#f0f3f7', minHeight: '100vh' }}>
 
-      {/* Section 0: HODs & Flagship Programmes */}
-      <div style={{ marginBottom: '14px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
-          {/* Total HODs Card */}
-          <div 
-            onClick={() => navigate('/hods')}
-            style={{
-              background: 'linear-gradient(135deg, #3f87ff 0%, #22c1c3 100%)',
-              borderRadius: '10px',
-              padding: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 3px 10px rgba(63, 135, 255, 0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-              minHeight: '95px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              border: '1px solid rgba(255,255,255,0.12)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 5px 14px rgba(63, 135, 255, 0.3)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 3px 10px rgba(63, 135, 255, 0.2)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Total HODs</p>
-              <h3 style={{ margin: '0 0 3px 0', fontSize: '24px', fontWeight: '700', color: '#fff' }}>{stats.totalHods || 0}</h3>
-              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{stats.activeHods || 0} Active • {(stats.totalHods || 0) - (stats.activeHods || 0)} Inactive</p>
-            </div>
-            <div style={{ position: 'absolute', right: '12px', top: '12px', opacity: 0.14 }}>
-              <FiUsers size={26} color="#fff" />
-            </div>
-          </div>
-
-          {/* Flagship Programmes Card */}
-          <div 
-            onClick={() => navigate('/flagship-programmes')}
-            style={{
-              background: 'linear-gradient(135deg, #5f72bd 0%, #9b23ea 100%)',
-              borderRadius: '10px',
-              padding: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 3px 10px rgba(155, 35, 234, 0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-              minHeight: '95px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              border: '1px solid rgba(255,255,255,0.12)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 5px 14px rgba(155, 35, 234, 0.3)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 3px 10px rgba(155, 35, 234, 0.2)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Flagship Programmes</p>
-              <h3 style={{ margin: '0 0 3px 0', fontSize: '24px', fontWeight: '700', color: '#fff' }}>{stats.totalPrograms || 0}</h3>
-              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{stats.activePrograms || 0} Active • {stats.inactivePrograms || 0} Inactive</p>
-            </div>
-            <div style={{ position: 'absolute', right: '12px', top: '12px', opacity: 0.14 }}>
-              <FiActivity size={26} color="#fff" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Section 1: Schemes Overview */}
-      <div style={{ marginBottom: '14px' }}>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '8px', 
-          marginBottom: '12px',
-          paddingLeft: '0px'
+      {/* Section 1: Quick Stats - Single Row with 5 Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+        
+        {/* Total HODs Card */}
+        <div style={{
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          borderRadius: '10px',
+          padding: '10px',
+          color: '#fff',
+          boxShadow: '0 2px 6px rgba(102, 126, 234, 0.12)',
+          cursor: 'pointer',
+          transition: 'all 0.3s ease'
+        }}
+        onClick={() => navigate('/hods')}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.2)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = '0 2px 6px rgba(102, 126, 234, 0.12)';
         }}>
-          <FiFileText size={20} style={{ color: '#2e7d32', fontWeight: 'bold' }} />
-          <h2 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1a1a2e' }}>Schemes Overview</h2>
+          <p style={{ margin: '0 0 2px 0', fontSize: '8px', fontWeight: '500', opacity: '0.9', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Total HODs</p>
+          <h2 style={{ margin: '0', fontSize: '18px', fontWeight: '700' }}>{stats?.totalHods || 0}</h2>
+          <p style={{ margin: '2px 0 0 0', fontSize: '8px', opacity: '0.85' }}>{stats?.activeHods || 0} Active</p>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
-          {/* Total Schemes Card */}
-          <div 
-            onClick={() => navigate('/schemes')}
-            style={{
-              background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-              borderRadius: '10px',
-              padding: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 3px 10px rgba(67, 233, 123, 0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-              minHeight: '90px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              border: '1px solid rgba(255,255,255,0.12)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 5px 14px rgba(67, 233, 123, 0.3)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 3px 10px rgba(67, 233, 123, 0.2)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Total Schemes</p>
-              <h3 style={{ margin: '0 0 3px 0', fontSize: '23px', fontWeight: '700', color: '#fff' }}>{schemesSummary.total.total}</h3>
-              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatCSBreakdown(schemesSummary.total.central, schemesSummary.total.state)}</p>
-            </div>
-          </div>
 
-          {/* Active Schemes Card */}
-          <div 
-            onClick={() => navigate('/schemes?status=active')}
-            style={{
-              background: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)',
-              borderRadius: '10px',
-              padding: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 3px 10px rgba(247, 151, 30, 0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-              minHeight: '90px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              border: '1px solid rgba(255,255,255,0.12)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 5px 14px rgba(247, 151, 30, 0.3)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 3px 10px rgba(247, 151, 30, 0.2)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Active Schemes</p>
-              <h3 style={{ margin: '0 0 3px 0', fontSize: '23px', fontWeight: '700', color: '#fff' }}>{schemesSummary.active.total}</h3>
-              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatCSBreakdown(schemesSummary.active.central, schemesSummary.active.state)}</p>
-            </div>
-          </div>
-
-          {/* Inactive Schemes Card */}
-          <div 
-            onClick={() => navigate('/schemes?status=inactive')}
-            style={{
-              background: 'linear-gradient(135deg, #5f72bd 0%, #9b23ea 100%)',
-              borderRadius: '10px',
-              padding: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 3px 10px rgba(155, 35, 234, 0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-              minHeight: '90px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              border: '1px solid rgba(255,255,255,0.12)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 5px 14px rgba(155, 35, 234, 0.3)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 3px 10px rgba(155, 35, 234, 0.2)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Inactive Schemes</p>
-              <h3 style={{ margin: '0 0 3px 0', fontSize: '23px', fontWeight: '700', color: '#fff' }}>{schemesSummary.inactive.total}</h3>
-              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatCSBreakdown(schemesSummary.inactive.central, schemesSummary.inactive.state)}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Section 2: Budget Overview */}
-      <div style={{ marginBottom: '14px' }}>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '8px', 
-          marginBottom: '12px',
-          paddingLeft: '0px'
+        {/* Flagship Programmes Card */}
+        <div style={{
+          background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+          borderRadius: '10px',
+          padding: '10px',
+          color: '#fff',
+          boxShadow: '0 2px 6px rgba(245, 87, 108, 0.12)',
+          cursor: 'pointer',
+          transition: 'all 0.3s ease'
+        }}
+        onClick={() => navigate('/flagship-programmes')}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 87, 108, 0.2)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = '0 2px 6px rgba(245, 87, 108, 0.12)';
         }}>
-          <BiRupee size={20} style={{ color: '#9b23ea', fontWeight: 'bold' }} />
-          <h2 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1a1a2e' }}>Budget Overview</h2>
+          <p style={{ margin: '0 0 2px 0', fontSize: '8px', fontWeight: '500', opacity: '0.9', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Flagship Programmes</p>
+          <h2 style={{ margin: '0', fontSize: '18px', fontWeight: '700' }}>{stats?.totalPrograms || 0}</h2>
+          <p style={{ margin: '2px 0 0 0', fontSize: '8px', opacity: '0.85' }}>{stats?.activePrograms || 0} Active</p>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
-          {/* Total Budget Card */}
-          <div 
-            onClick={() => navigate('/budget')}
-            style={{
-              background: 'linear-gradient(135deg, #9b23ea 0%, #5f72bd 100%)',
-              borderRadius: '10px',
-              padding: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 3px 10px rgba(155, 35, 234, 0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-              minHeight: '90px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              border: '1px solid rgba(255,255,255,0.12)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 5px 14px rgba(155, 35, 234, 0.3)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 3px 10px rgba(155, 35, 234, 0.2)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Total Budget</p>
-              <h3 style={{ margin: '0 0 3px 0', fontSize: '20px', fontWeight: '700', color: '#fff' }}>{formatCurrency(budgetSummary.total.total)}</h3>
-              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatCSBudgetBreakdown(budgetSummary.total.central, budgetSummary.total.state)}</p>
-            </div>
-          </div>
 
-          {/* Utilized Budget Card */}
-          <div 
-            onClick={() => navigate('/budget')}
-            style={{
-              background: 'linear-gradient(135deg, #00b09b 0%, #96c93d 100%)',
-              borderRadius: '10px',
-              padding: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 3px 10px rgba(0, 176, 155, 0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-              minHeight: '90px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              border: '1px solid rgba(255,255,255,0.12)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 5px 14px rgba(0, 176, 155, 0.3)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 3px 10px rgba(0, 176, 155, 0.2)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Budget Utilized</p>
-              <h3 style={{ margin: '0 0 3px 0', fontSize: '20px', fontWeight: '700', color: '#fff' }}>{formatCurrency(budgetSummary.utilized.total)}</h3>
-              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatCSBudgetBreakdown(budgetSummary.utilized.central, budgetSummary.utilized.state)}</p>
-            </div>
-          </div>
-
-          {/* Remaining Budget Card */}
-          <div 
-            onClick={() => navigate('/budget')}
-            style={{
-              background: 'linear-gradient(135deg, #3f87ff 0%, #6a5af9 100%)',
-              borderRadius: '10px',
-              padding: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 3px 10px rgba(63, 135, 255, 0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-              minHeight: '90px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              border: '1px solid rgba(255,255,255,0.12)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 5px 14px rgba(63, 135, 255, 0.3)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 3px 10px rgba(63, 135, 255, 0.2)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Remaining Budget</p>
-              <h3 style={{ margin: '0 0 3px 0', fontSize: '20px', fontWeight: '700', color: '#fff' }}>{formatCurrency(budgetSummary.remaining.total)}</h3>
-              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatCSBudgetBreakdown(budgetSummary.remaining.central, budgetSummary.remaining.state)}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Section 3: Attendance Overview (Today) */}
-      <div style={{ marginBottom: '14px' }}>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '8px', 
-          marginBottom: '12px',
-          paddingLeft: '0px'
+        {/* Total Budget Card */}
+        <div style={{
+          background: 'linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%)',
+          borderRadius: '10px',
+          padding: '10px',
+          color: '#fff',
+          boxShadow: '0 2px 6px rgba(156, 39, 176, 0.12)',
+          cursor: 'pointer',
+          transition: 'all 0.3s ease'
+        }}
+        onClick={() => navigate('/budget')}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(156, 39, 176, 0.2)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = '0 2px 6px rgba(156, 39, 176, 0.12)';
         }}>
-          <FiUserCheck size={20} style={{ color: '#3f87ff', fontWeight: 'bold' }} />
-          <h2 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1a1a2e' }}>Attendance (Today)</h2>
+          <p style={{ margin: '0 0 2px 0', fontSize: '8px', fontWeight: '500', opacity: '0.95', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Total Budget</p>
+          <h3 style={{ margin: '0', fontSize: '15px', fontWeight: '700' }}>₹{((budgetSummary?.total?.total || 0) / 10000000).toFixed(1)} Cr</h3>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
-          {/* Total Employees Card */}
-          <div 
-            onClick={() => navigate('/staff')}
-            style={{
-              background: 'linear-gradient(135deg, #3f87ff 0%, #22c1c3 100%)',
-              borderRadius: '10px',
-              padding: '12px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 3px 10px rgba(63, 135, 255, 0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-              minHeight: '85px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              border: '1px solid rgba(255,255,255,0.12)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 5px 14px rgba(63, 135, 255, 0.3)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 3px 10px rgba(63, 135, 255, 0.2)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <p style={{ margin: '0 0 4px 0', fontSize: '10px', color: 'rgba(255,255,255,0.85)', fontWeight: '500' }}>Total Emp</p>
-              <h3 style={{ margin: '0 0 2px 0', fontSize: '20px', fontWeight: '700', color: '#fff' }}>{stats.totalStaff || 0}</h3>
-              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatPercent(stats.totalStaff || 0, stats.totalStaff || 0)}</p>
-            </div>
-          </div>
 
-          {/* Present Card */}
-          <div 
-            onClick={() => navigate('/attendance?status=present')}
-            style={{
-              background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-              borderRadius: '10px',
-              padding: '12px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 3px 10px rgba(67, 233, 123, 0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-              minHeight: '85px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              border: '1px solid rgba(255,255,255,0.12)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 5px 14px rgba(67, 233, 123, 0.3)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 3px 10px rgba(67, 233, 123, 0.2)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <p style={{ margin: '0 0 4px 0', fontSize: '10px', color: 'rgba(255,255,255,0.85)', fontWeight: '500' }}>Present</p>
-              <h3 style={{ margin: '0 0 2px 0', fontSize: '20px', fontWeight: '700', color: '#fff' }}>{stats.todayAttendance?.present || 0}</h3>
-              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatPercent(stats.todayAttendance?.present || 0, stats.totalStaff || 0)}</p>
-            </div>
-          </div>
-
-          {/* Absent Card */}
-          <div 
-            onClick={() => navigate('/attendance?status=absent')}
-            style={{
-              background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)',
-              borderRadius: '10px',
-              padding: '12px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 3px 10px rgba(255, 65, 108, 0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-              minHeight: '85px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              border: '1px solid rgba(255,255,255,0.12)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 5px 14px rgba(255, 65, 108, 0.3)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 3px 10px rgba(255, 65, 108, 0.2)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <p style={{ margin: '0 0 4px 0', fontSize: '10px', color: 'rgba(255,255,255,0.85)', fontWeight: '500' }}>Absent</p>
-              <h3 style={{ margin: '0 0 2px 0', fontSize: '20px', fontWeight: '700', color: '#fff' }}>{stats.todayAttendance?.absent || 0}</h3>
-              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatPercent(stats.todayAttendance?.absent || 0, stats.totalStaff || 0)}</p>
-            </div>
-          </div>
-
-          {/* Late Card */}
-          <div 
-            onClick={() => navigate('/attendance?status=late')}
-            style={{
-              background: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)',
-              borderRadius: '10px',
-              padding: '12px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 3px 10px rgba(247, 151, 30, 0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-              minHeight: '85px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              border: '1px solid rgba(255,255,255,0.12)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 5px 14px rgba(247, 151, 30, 0.3)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 3px 10px rgba(247, 151, 30, 0.2)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <p style={{ margin: '0 0 4px 0', fontSize: '10px', color: 'rgba(255,255,255,0.85)', fontWeight: '500' }}>Late (after 10:30)</p>
-              <h3 style={{ margin: '0 0 2px 0', fontSize: '20px', fontWeight: '700', color: '#fff' }}>{stats.todayAttendance?.late || 0}</h3>
-              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatPercent(stats.todayAttendance?.late || 0, stats.totalStaff || 0)}</p>
-            </div>
-          </div>
-
-          {/* On Leave Card */}
-          <div 
-            onClick={() => navigate('/attendance?status=leave')}
-            style={{
-              background: 'linear-gradient(135deg, #00b09b 0%, #96c93d 100%)',
-              borderRadius: '10px',
-              padding: '12px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 3px 10px rgba(0, 176, 155, 0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-              minHeight: '85px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              border: '1px solid rgba(255,255,255,0.12)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 5px 14px rgba(0, 176, 155, 0.3)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 3px 10px rgba(0, 176, 155, 0.2)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <p style={{ margin: '0 0 4px 0', fontSize: '10px', color: 'rgba(255,255,255,0.85)', fontWeight: '500' }}>On Leave</p>
-              <h3 style={{ margin: '0 0 2px 0', fontSize: '20px', fontWeight: '700', color: '#fff' }}>{stats.todayAttendance?.onLeave || 0}</h3>
-              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatPercent(stats.todayAttendance?.onLeave || 0, stats.totalStaff || 0)}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Section 4: Budget Breakdown (Estimated / Sanction / Pending) */}
-      <div style={{ marginBottom: '14px' }}>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '10px', 
-          marginBottom: '12px',
-          paddingLeft: '0px'
+        {/* Budget Utilized Card */}
+        <div style={{
+          background: 'linear-gradient(135deg, #26A69A 0%, #4DB6AC 100%)',
+          borderRadius: '10px',
+          padding: '10px',
+          color: '#fff',
+          boxShadow: '0 2px 6px rgba(38, 166, 154, 0.12)',
+          cursor: 'pointer',
+          transition: 'all 0.3s ease'
+        }}
+        onClick={() => navigate('/budget')}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(38, 166, 154, 0.2)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = '0 2px 6px rgba(38, 166, 154, 0.12)';
         }}>
-          <BiWallet size={24} style={{ color: '#f39c12', fontWeight: 'bold' }} />
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1a1a2e' }}>Budget Breakdown</h2>
+          <p style={{ margin: '0 0 2px 0', fontSize: '8px', fontWeight: '500', opacity: '0.95', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Utilized</p>
+          <h3 style={{ margin: '0', fontSize: '15px', fontWeight: '700' }}>₹{((budgetSummary?.utilized?.total || 0) / 10000000).toFixed(1)} Cr</h3>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
-          {/* Estimated Budget Card */}
-          <div 
-            onClick={() => navigate('/budget')}
-            style={{
-              background: 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)',
-              borderRadius: '10px',
-              padding: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 3px 10px rgba(243, 156, 18, 0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-              minHeight: '90px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              border: '1px solid rgba(255,255,255,0.12)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 5px 14px rgba(243, 156, 18, 0.3)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 3px 10px rgba(243, 156, 18, 0.2)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <p style={{ margin: '0 0 4px 0', fontSize: '10px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Estimated Budget</p>
-              <h3 style={{ margin: '0 0 2px 0', fontSize: '18px', fontWeight: '700', color: '#fff' }}>{formatCurrency(budgetBreakdown.estimated.total)}</h3>
-              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatCSBudgetBreakdown(budgetBreakdown.estimated.central, budgetBreakdown.estimated.state)}</p>
+
+        {/* Budget Remaining Card */}
+        <div style={{
+          background: 'linear-gradient(135deg, #42A5F5 0%, #1E88E5 100%)',
+          borderRadius: '10px',
+          padding: '10px',
+          color: '#fff',
+          boxShadow: '0 2px 6px rgba(66, 165, 245, 0.12)',
+          cursor: 'pointer',
+          transition: 'all 0.3s ease'
+        }}
+        onClick={() => navigate('/budget')}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(66, 165, 245, 0.2)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = '0 2px 6px rgba(66, 165, 245, 0.12)';
+        }}>
+          <p style={{ margin: '0 0 2px 0', fontSize: '8px', fontWeight: '500', opacity: '0.95', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Remaining</p>
+          <h3 style={{ margin: '0', fontSize: '15px', fontWeight: '700' }}>₹{((budgetSummary?.remaining?.total || 0) / 10000000).toFixed(1)} Cr</h3>
+        </div>
+      </div>
+
+      {/* Section 3: Budget Overview */}
+      <div style={{ marginBottom: '12px' }}>
+
+
+        {/* Budget Chart Section */}
+        <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            {/* Budget Breakdown Chart */}
+            <div>
+              <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '600', color: '#333' }}>Budget Breakdown</h4>
+              <div style={{ height: '250px' }}>
+                <Pie data={budgetBreakdownChartData} options={pieChartOptions} />
+              </div>
+            </div>
+
+            {/* Budget Utilized vs Remaining */}
+            <div>
+              <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '600', color: '#333' }}>Budget Status</h4>
+              <div style={{ height: '250px' }}>
+                <Doughnut data={budgetStatusChartData} options={{
+                  ...pieChartOptions,
+                  plugins: {
+                    ...pieChartOptions.plugins,
+                    centerText: true
+                  }
+                }} plugins={[budgetStatusCenterTextPlugin]} />
+              </div>
             </div>
           </div>
+        </div>
 
-          {/* Sanction Budget Card */}
-          <div 
-            onClick={() => navigate('/budget')}
-            style={{
-              background: 'linear-gradient(135deg, #27ae60 0%, #229954 100%)',
-              borderRadius: '10px',
-              padding: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 3px 10px rgba(39, 174, 96, 0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-              minHeight: '90px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              border: '1px solid rgba(255,255,255,0.12)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 5px 14px rgba(39, 174, 96, 0.3)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 3px 10px rgba(39, 174, 96, 0.2)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <p style={{ margin: '0 0 4px 0', fontSize: '10px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Budget Sanction</p>
-              <h3 style={{ margin: '0 0 2px 0', fontSize: '18px', fontWeight: '700', color: '#fff' }}>{formatCurrency(budgetBreakdown.sanction.total)}</h3>
-              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatCSBudgetBreakdown(budgetBreakdown.sanction.central, budgetBreakdown.sanction.state)}</p>
-            </div>
-          </div>
+        {/* Schemes Chart Section */}
+        <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginTop: '16px' }}>
 
-          {/* Pending Budget Card */}
-          <div 
-            onClick={() => navigate('/budget')}
-            style={{
-              background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
-              borderRadius: '10px',
-              padding: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 3px 10px rgba(231, 76, 60, 0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-              minHeight: '90px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              border: '1px solid rgba(255,255,255,0.12)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 5px 14px rgba(231, 76, 60, 0.3)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 3px 10px rgba(231, 76, 60, 0.2)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <p style={{ margin: '0 0 4px 0', fontSize: '10px', color: 'rgba(255,255,255,0.85)', fontWeight: '500', letterSpacing: '0.3px' }}>Pending Budget</p>
-              <h3 style={{ margin: '0 0 2px 0', fontSize: '18px', fontWeight: '700', color: '#fff' }}>{formatCurrency(budgetBreakdown.pending.total)}</h3>
-              <p style={{ margin: '0', fontSize: '9px', color: 'rgba(255,255,255,0.8)' }}>{formatCSBudgetBreakdown(budgetBreakdown.pending.central, budgetBreakdown.pending.state)}</p>
+          {/* Schemes Overview Chart */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
+            {/* Schemes Bar Chart - Total, Active, Inactive */}
+            <div>
+              <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '600', color: '#333' }}>Schemes Overview</h4>
+              <div style={{ height: '180px' }}>
+                <Bar data={{
+                  labels: ['Total', 'Active', 'Inactive'],
+                  datasets: [{
+                    label: 'Schemes Count',
+                    data: [
+                      stats?.totalSchemes || 0,
+                      stats?.activeSchemes || 0,
+                      (stats?.totalSchemes || 0) - (stats?.activeSchemes || 0)
+                    ],
+                    backgroundColor: ['#667eea', '#26A69A', '#FF9800'],
+                    borderRadius: 6,
+                    borderSkipped: false,
+                    hoverBackgroundColor: ['#5568d3', '#1e9b8a', '#e68900']
+                  }]
+                }} options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  indexAxis: 'y',
+                  plugins: {
+                    legend: {
+                      display: false
+                    },
+                    tooltip: {
+                      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                      padding: 12,
+                      titleFont: { size: 14, weight: 'bold' },
+                      bodyFont: { size: 13 },
+                      callbacks: {
+                        label: function(context) {
+                          const value = context.parsed.x || 0;
+                          return `Count: ${value}`;
+                        }
+                      }
+                    }
+                  },
+                  scales: {
+                    x: {
+                      beginAtZero: true,
+                      grid: {
+                        color: 'rgba(0,0,0,0.05)'
+                      },
+                      ticks: {
+                        stepSize: 1
+                      }
+                    },
+                    y: {
+                      grid: {
+                        display: false
+                      }
+                    }
+                  },
+                  onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                      const element = elements[0];
+                      const label = ['Total', 'Active', 'Inactive'][element.index];
+                      
+                      let items = [];
+                      let columns = [];
+                      let title = '';
+                      
+                      // Fetch schemes data from API
+                      if (label === 'Total') {
+                        // Show all schemes
+                        items = schemesByHOD.map(item => ({
+                          hod_name: item.hod_name || 'Unknown',
+                          scheme_count: item.scheme_count || 0,
+                          total_budget: item.total_budget || 0,
+                          status: 'All'
+                        }));
+                        title = 'Total Schemes';
+                        columns = [
+                          { key: 'hod_name', label: 'HOD Name' },
+                          { key: 'scheme_count', label: 'Scheme Count' },
+                          { key: 'total_budget', label: 'Total Budget' }
+                        ];
+                      } else if (label === 'Active') {
+                        // Show only active schemes
+                        items = schemesByHOD.map(item => ({
+                          hod_name: item.hod_name || 'Unknown',
+                          scheme_count: item.scheme_count || 0,
+                          total_budget: item.total_budget || 0,
+                          status: 'Active'
+                        }));
+                        title = 'Active Schemes';
+                        columns = [
+                          { key: 'hod_name', label: 'HOD Name' },
+                          { key: 'scheme_count', label: 'Scheme Count' },
+                          { key: 'total_budget', label: 'Total Budget' }
+                        ];
+                      } else if (label === 'Inactive') {
+                        // Calculate inactive schemes
+                        const inactiveCount = (stats?.totalSchemes || 0) - (stats?.activeSchemes || 0);
+                        
+                        // Show message about inactive schemes
+                        items = [{
+                          hod_name: 'Total Inactive Schemes',
+                          scheme_count: inactiveCount,
+                          total_budget: 'View in Schemes page for details',
+                          status: 'Inactive'
+                        }];
+                        title = 'Inactive Schemes';
+                        columns = [
+                          { key: 'hod_name', label: 'Description' },
+                          { key: 'scheme_count', label: 'Count' },
+                          { key: 'total_budget', label: 'Details' }
+                        ];
+                      }
+                      
+                      if (items.length > 0) {
+                        setModalData({ title, items, columns });
+                        setModalOpen(true);
+                      }
+                    }
+                  }
+                }} />
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Section 5: Charts - 2x2 Grid Layout */}
+      {/* Section 4: Charts - 2x2 Grid Layout */}
       <div style={{ marginBottom: '14px' }}>
         <div style={{ 
           display: 'flex', 
@@ -2474,7 +2591,7 @@ if (!isNaN(safeTotal)) {
             </div>
           </div>
 
-          {/* Chart 2: Schemes (HOD wise) - Bar + Line Combined Chart */}
+          {/* Chart 2: Schemes (HOD wise) - Donut Chart */}
           <div style={{
             backgroundColor: '#fff',
             borderRadius: '12px',
@@ -2488,26 +2605,11 @@ if (!isNaN(safeTotal)) {
               padding: '12px 16px',
               borderBottom: '1px solid #f0f0f0'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#1a1a2e', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <FiBarChart2 size={16} style={{ color: '#2196F3' }} />
-                  {isSchemeWiseView ? 'Schemes (Scheme wise)' : 'Schemes (HOD wise)'} 
-                  {chartFilters.schemes.hod_id && <span style={{ fontSize: '11px', color: '#666', fontWeight: 'normal' }}>({allHODs.find(h => h.id === parseInt(chartFilters.schemes.hod_id))?.name})</span>}
-                </h3>
-                {isSchemeWiseView && (
-                  <div style={{ display: 'flex', gap: '10px', fontSize: '11px' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: 'rgba(76, 175, 80, 0.8)' }}></span> Completed
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: 'rgba(255, 193, 7, 0.8)' }}></span> Planned
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: 'rgba(33, 150, 243, 0.8)' }}></span> Active
-                    </span>
-                  </div>
-                )}
-              </div>
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#1a1a2e', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FiPieChart size={16} style={{ color: '#2196F3' }} />
+                Schemes (HOD wise) 
+                {chartFilters.schemes.hod_id && <span style={{ fontSize: '11px', color: '#666', fontWeight: 'normal' }}>({allHODs.find(h => h.id === parseInt(chartFilters.schemes.hod_id))?.name})</span>}
+              </h3>
               <div style={{ position: 'relative' }}>
                 <FiFilter 
                   style={{ cursor: 'pointer', color: chartFilters.schemes.hod_id ? '#2e7d32' : '#666', fontSize: '16px' }} 
@@ -2518,7 +2620,7 @@ if (!isNaN(safeTotal)) {
               </div>
             </div>
             <div style={{ padding: '14px', height: '260px' }}>
-              <Bar data={schemesHODBarLineData} options={schemesBarLineOptions} />
+              <Doughnut data={schemesHODChartData} options={schemesChartOptions} plugins={[ChartDataLabels]} />
             </div>
           </div>
 
@@ -2551,7 +2653,7 @@ if (!isNaN(safeTotal)) {
               </div>
             </div>
             <div style={{ padding: '14px', height: '310px' }}>
-              <Pie data={budgetHODPieChartData} options={pieChartOptions} />
+              <Doughnut data={budgetHODPieChartData} options={pieChartOptions} plugins={[ChartDataLabels, centerTextPlugin]} />
             </div>
           </div>
 
